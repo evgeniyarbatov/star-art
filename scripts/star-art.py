@@ -782,7 +782,7 @@ def main(locations_file="stargazing-locations.json"):
     fovs = [180]
     azimuths = [0]
     altitudes = [90]
-    magnitudes = [10.0]
+    magnitudes = [2.0, 3.5, 6.0, 10.0]
 
     total = len(locations) * len(STYLES) * len(fovs) * len(azimuths) * len(altitudes) * len(magnitudes)
     current = 0
