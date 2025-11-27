@@ -60,7 +60,7 @@ def add_info_text(fig, ax, location, obs_time, magnitude, fov, azimuth, altitude
                  f"Mag ≤{magnitude}  |  FOV {fov}°  |  Az {azimuth}°  Alt {altitude}°")
 
     fig.text(
-        0.5, 0.02, info_text,
+        0.5, -0.02, info_text,
         ha='center', fontsize=9,
         family='monospace', weight='normal',
         color=text_color
