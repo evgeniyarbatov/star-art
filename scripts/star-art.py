@@ -33,17 +33,39 @@ def style(name):
 
 def add_info_text(fig, ax, location, obs_time, magnitude, fov, azimuth, altitude, bg_color):
     """Add information text with automatic light/dark contrast."""
-
-    # Determine readable text color
-    # simple luminance check: white = 255, black = 0
-    luminance = 255 if bg_color.lower() == "white" else 0
+    
+    # Determine readable text color based on background luminance
+    def get_luminance(color):
+        """Calculate relative luminance of a color."""
+        # Handle hex colors
+        if color.startswith('#'):
+            hex_color = color.lstrip('#')
+            if len(hex_color) == 6:
+                r, g, b = int(hex_color[0:2], 16), int(hex_color[2:4], 16), int(hex_color[4:6], 16)
+            elif len(hex_color) == 3:
+                r, g, b = int(hex_color[0]*2, 16), int(hex_color[1]*2, 16), int(hex_color[2]*2, 16)
+            else:
+                return 255  # Default to white if can't parse
+        # Handle named colors
+        elif color.lower() == 'white':
+            r, g, b = 255, 255, 255
+        elif color.lower() == 'black':
+            r, g, b = 0, 0, 0
+        else:
+            # For other named colors, assume light background
+            return 200
+        
+        # Calculate relative luminance (perceived brightness)
+        return 0.299 * r + 0.587 * g + 0.114 * b
+    
+    luminance = get_luminance(bg_color)
     text_color = "black" if luminance > 128 else "white"
-
+    
     # Process location/time
     name = location.get('name', 'Unknown') if isinstance(location, dict) else str(location)
     lat = location.get('lat', 0.0)
     lon = location.get('lon', 0.0)
-
+    
     tz_name = TF.timezone_at(lat=lat, lng=lon)
     if tz_name:
         try:
@@ -54,18 +76,17 @@ def add_info_text(fig, ax, location, obs_time, magnitude, fov, azimuth, altitude
             time_str = obs_time.strftime('%Y-%m-%d %H:%M UTC')
     else:
         time_str = obs_time.strftime('%Y-%m-%d %H:%M UTC')
-
+    
     info_text = (f"{name}  |  {lat:.2f}°, {lon:.2f}°  |  "
                  f"{time_str}  |  "
                  f"Mag ≤{magnitude}  |  FOV {fov}°  |  Az {azimuth}°  Alt {altitude}°")
-
+    
     fig.text(
         0.5, -0.02, info_text,
         ha='center', fontsize=9,
         family='monospace', weight='normal',
         color=text_color
     )
-
 
 def stereographic_project(alt, az, center_alt, center_az, fov):
     """Project arrays of alt (deg) and az (deg) to 2D using stereographic projection
@@ -231,37 +252,214 @@ def get_visible_stars(observer, obs_time, magnitude_limit, center_alt, center_az
         'count': int(np.sum(mask))
     }
 
-
 @style('minimal')
 def minimal_style(stars, fov):
-
     if stars is None or stars.get('count', 0) == 0:
         return None, 'white'
-
-    sizes = 50 * np.exp(-stars['mag'] / 2.5)
 
     fig, ax = plt.subplots(figsize=(12, 12), facecolor='white', dpi=300)
     ax.set_facecolor('white')
     ax.set_aspect('equal')
 
-    # plot stars
-    ax.scatter(stars['x'], stars['y'], s=sizes, c='black', alpha=0.9, linewidths=0)
+    # Improved size scaling for better visual hierarchy
+    # Brighter stars (lower magnitude) appear larger
+    sizes = 80 * np.exp(-stars['mag'] / 2.0)
+    
+    # Plot stars with subtle opacity variation based on magnitude
+    alphas = np.clip(0.95 - (stars['mag'] - np.min(stars['mag'])) / 15, 0.6, 0.95)
+    
+    ax.scatter(stars['x'], stars['y'], s=sizes, c='black', 
+              alpha=alphas, linewidths=0, edgecolors='none')
 
-    # use actual projection radius
+    # Use actual projection radius
     radii = np.sqrt(stars['x']**2 + stars['y']**2)
-    r_max = np.max(radii) * 1
+    r_max = np.max(radii) * 1.0
 
-    # expand visible area
     ax.set_xlim(-r_max, r_max)
     ax.set_ylim(-r_max, r_max)
-
     ax.axis('off')
 
-    # draw circle boundary
+    # Draw circle boundary
+    circle = plt.Circle((0, 0), r_max, color="black", fill=False, linewidth=0.3)
+    ax.add_patch(circle)
+
+    return fig, 'white'
+
+@style('stones')
+def stones_style(stars, fov):
+    """Zen garden stones arrangement"""
+    if stars is None or stars.get('count', 0) == 0:
+        return None, 'white'
+
+    fig, ax = plt.subplots(figsize=(12, 12), facecolor='#e8e6e0', dpi=300)
+    ax.set_facecolor('#e8e6e0')
+    ax.set_aspect('equal')
+
+    radii = np.sqrt(stars['x']**2 + stars['y']**2)
+    r_max = np.max(radii) * 1.0
+
+    # Draw stars as rounded stones
+    sizes = 100 * np.exp(-stars['mag'] / 2.0)
+    
+    # Shadow layer
+    ax.scatter(stars['x'] + 0.05, stars['y'] - 0.05, s=sizes * 1.1, 
+              c='#3a3a3a', alpha=0.15, linewidths=0)
+    
+    # Stone layer
+    ax.scatter(stars['x'], stars['y'], s=sizes, c='#4a4a4a', 
+              alpha=0.9, linewidths=0.5, edgecolors='#2a2a2a')
+
+    ax.set_xlim(-r_max, r_max)
+    ax.set_ylim(-r_max, r_max)
+    ax.axis('off')
+
+    circle = plt.Circle((0, 0), r_max, color="#4a4a4a", fill=False, linewidth=0.2)
+    ax.add_patch(circle)
+
+    return fig, '#e8e6e0'
+
+
+@style('breath')
+def breath_style(stars, fov):
+    """Breathing space with minimal marks"""
+    if stars is None or stars.get('count', 0) == 0:
+        return None, 'white'
+
+    fig, ax = plt.subplots(figsize=(12, 12), facecolor='white', dpi=300)
+    ax.set_facecolor('white')
+    ax.set_aspect('equal')
+
+    radii = np.sqrt(stars['x']**2 + stars['y']**2)
+    r_max = np.max(radii) * 1.0
+
+    # Only show brightest stars
+    bright_mask = stars['mag'] <= 4.5
+    if np.any(bright_mask):
+        x_bright = stars['x'][bright_mask]
+        y_bright = stars['y'][bright_mask]
+        mag_bright = stars['mag'][bright_mask]
+        
+        sizes = 20 * np.exp(-mag_bright / 2.0)
+        ax.scatter(x_bright, y_bright, s=sizes, c='#1a1a1a', 
+                  alpha=0.7, linewidths=0)
+
+    ax.set_xlim(-r_max, r_max)
+    ax.set_ylim(-r_max, r_max)
+    ax.axis('off')
+
     circle = plt.Circle((0, 0), r_max, color="black", fill=False, linewidth=0.2)
     ax.add_patch(circle)
 
     return fig, 'white'
+
+
+@style('wabi_sabi')
+def wabi_sabi_style(stars, fov):
+    """Imperfect, impermanent, incomplete beauty"""
+    if stars is None or stars.get('count', 0) == 0:
+        return None, 'white'
+
+    fig, ax = plt.subplots(figsize=(12, 12), facecolor='#f0ebe5', dpi=300)
+    ax.set_facecolor('#f0ebe5')
+    ax.set_aspect('equal')
+
+    radii = np.sqrt(stars['x']**2 + stars['y']**2)
+    r_max = np.max(radii) * 1.0
+
+    # Add subtle noise to positions for imperfection
+    noise_x = np.random.normal(0, 0.02, len(stars['x']))
+    noise_y = np.random.normal(0, 0.02, len(stars['y']))
+    
+    x_imperfect = stars['x'] + noise_x
+    y_imperfect = stars['y'] + noise_y
+
+    # Varying sizes with irregularity
+    base_sizes = 25 * np.exp(-stars['mag'] / 2.5)
+    size_variation = np.random.uniform(0.8, 1.2, len(base_sizes))
+    sizes = base_sizes * size_variation
+
+    # Plot with earth tones
+    ax.scatter(x_imperfect, y_imperfect, s=sizes, c='#3d3d3d', 
+              alpha=0.75, linewidths=0)
+
+    ax.set_xlim(-r_max, r_max)
+    ax.set_ylim(-r_max, r_max)
+    ax.axis('off')
+
+    circle = plt.Circle((0, 0), r_max, color="#3d3d3d", fill=False, linewidth=0.2)
+    ax.add_patch(circle)
+
+    return fig, '#f0ebe5'
+
+
+@style('haiku')
+def haiku_style(stars, fov):
+    """Three visual elements like haiku's three lines"""
+    if stars is None or stars.get('count', 0) == 0:
+        return None, 'white'
+
+    fig, ax = plt.subplots(figsize=(12, 12), facecolor='#fcfcf8', dpi=300)
+    ax.set_facecolor('#fcfcf8')
+    ax.set_aspect('equal')
+
+    radii = np.sqrt(stars['x']**2 + stars['y']**2)
+    r_max = np.max(radii) * 1.0
+
+    # Select exactly 3 brightest stars or star groups
+    brightest_indices = np.argsort(stars['mag'])[:3]
+    
+    for idx in brightest_indices:
+        x, y, mag = stars['x'][idx], stars['y'][idx], stars['mag'][idx]
+        size = 60 * np.exp(-mag / 2.0)
+        ax.scatter(x, y, s=size, c='#2a2a2a', alpha=0.9, linewidths=0)
+
+    ax.set_xlim(-r_max, r_max)
+    ax.set_ylim(-r_max, r_max)
+    ax.axis('off')
+
+    circle = plt.Circle((0, 0), r_max, color="#2a2a2a", fill=False, linewidth=0.2)
+    ax.add_patch(circle)
+
+    return fig, '#fcfcf8'
+
+
+@style('sand_ripples')
+def sand_ripples_style(stars, fov):
+    """Zen garden raked sand patterns"""
+    if stars is None or stars.get('count', 0) == 0:
+        return None, 'white'
+
+    fig, ax = plt.subplots(figsize=(12, 12), facecolor='#ebe8e0', dpi=300)
+    ax.set_facecolor('#ebe8e0')
+    ax.set_aspect('equal')
+
+    radii = np.sqrt(stars['x']**2 + stars['y']**2)
+    r_max = np.max(radii) * 1.0
+
+    # Draw ripple patterns around brightest stars
+    brightest_indices = np.argsort(stars['mag'])[:5]
+    
+    for idx in brightest_indices:
+        x, y = stars['x'][idx], stars['y'][idx]
+        for ring in range(1, 6):
+            radius = 0.2 * ring
+            circle = plt.Circle((x, y), radius, color='#6a6a6a', 
+                              fill=False, linewidth=0.2, alpha=0.25)
+            ax.add_patch(circle)
+
+    # Plot stars
+    sizes = 35 * np.exp(-stars['mag'] / 2.5)
+    ax.scatter(stars['x'], stars['y'], s=sizes, c='#3a3a3a', 
+              alpha=0.8, linewidths=0)
+
+    ax.set_xlim(-r_max, r_max)
+    ax.set_ylim(-r_max, r_max)
+    ax.axis('off')
+
+    circle = plt.Circle((0, 0), r_max, color="#3a3a3a", fill=False, linewidth=0.2)
+    ax.add_patch(circle)
+
+    return fig, '#ebe8e0'
 
 def create_artwork(location, style_name, magnitude, fov, azimuth, altitude):
     """Create star map artwork for a single location and parameter set."""
@@ -344,7 +542,7 @@ def main(locations_file="stargazing-locations.json"):
     fovs = [180]
     azimuths = [0]
     altitudes = [90]
-    magnitudes = [3.5, 6.0, 10.0]
+    magnitudes = [10.0]
 
     total = len(locations) * len(STYLES) * len(fovs) * len(azimuths) * len(altitudes) * len(magnitudes)
     current = 0
