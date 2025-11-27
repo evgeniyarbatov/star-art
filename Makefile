@@ -13,8 +13,8 @@ install: venv
 	@$(PIP) install --disable-pip-version-check -q --upgrade pip
 	@$(PIP) install --disable-pip-version-check -q -r $(REQUIREMENTS)
 
-art:
+art: clean
 	@$(PYTHON) scripts/star-art.py
 
 clean:
-	rm images/*.png
+	rm -f images/*.png

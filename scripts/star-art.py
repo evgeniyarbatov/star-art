@@ -31,19 +31,19 @@ def style(name):
     return decorator
 
 
-def add_info_text(fig, ax, location, obs_time, magnitude, fov, azimuth, altitude):
-    """Add information text at bottom of image
+def add_info_text(fig, ax, location, obs_time, magnitude, fov, azimuth, altitude, bg_color):
+    """Add information text with automatic light/dark contrast."""
 
-    fig, ax: matplotlib figure and axis
-    location: dict with 'lat','lon','name' optional
-    obs_time: aware datetime (UTC)
-    magnitude, fov, azimuth, altitude: numeric
-    """
+    # Determine readable text color
+    # simple luminance check: white = 255, black = 0
+    luminance = 255 if bg_color.lower() == "white" else 0
+    text_color = "black" if luminance > 128 else "white"
+
+    # Process location/time
     name = location.get('name', 'Unknown') if isinstance(location, dict) else str(location)
     lat = location.get('lat', 0.0)
     lon = location.get('lon', 0.0)
 
-    # Get exact timezone for location
     tz_name = TF.timezone_at(lat=lat, lng=lon)
     if tz_name:
         try:
@@ -51,7 +51,6 @@ def add_info_text(fig, ax, location, obs_time, magnitude, fov, azimuth, altitude
             local_time = obs_time.astimezone(tz)
             time_str = local_time.strftime('%Y-%m-%d %H:%M %Z')
         except Exception:
-            # Fallback
             time_str = obs_time.strftime('%Y-%m-%d %H:%M UTC')
     else:
         time_str = obs_time.strftime('%Y-%m-%d %H:%M UTC')
@@ -60,9 +59,12 @@ def add_info_text(fig, ax, location, obs_time, magnitude, fov, azimuth, altitude
                  f"{time_str}  |  "
                  f"Mag ≤{magnitude}  |  FOV {fov}°  |  Az {azimuth}°  Alt {altitude}°")
 
-    # Use figure text so it is placed relative to the full canvas
-    fig.text(0.5, 0.02, info_text, ha='center', fontsize=9,
-             family='monospace', weight='normal')
+    fig.text(
+        0.5, 0.02, info_text,
+        ha='center', fontsize=9,
+        family='monospace', weight='normal',
+        color=text_color
+    )
 
 
 def stereographic_project(alt, az, center_alt, center_az, fov):
@@ -232,7 +234,7 @@ def get_visible_stars(observer, obs_time, magnitude_limit, center_alt, center_az
 
 @style('minimal')
 def minimal_style(stars, fov):
-    """Minimalistic black stars on white background"""
+
     if stars is None or stars.get('count', 0) == 0:
         return None, 'white'
 
@@ -242,12 +244,22 @@ def minimal_style(stars, fov):
     ax.set_facecolor('white')
     ax.set_aspect('equal')
 
+    # plot stars
     ax.scatter(stars['x'], stars['y'], s=sizes, c='black', alpha=0.9, linewidths=0)
 
-    limit = fov / 50.0
-    ax.set_xlim(-limit, limit)
-    ax.set_ylim(-limit, limit)
+    # use actual projection radius
+    radii = np.sqrt(stars['x']**2 + stars['y']**2)
+    r_max = np.max(radii) * 1
+
+    # expand visible area
+    ax.set_xlim(-r_max, r_max)
+    ax.set_ylim(-r_max, r_max)
+
     ax.axis('off')
+
+    # draw circle boundary
+    circle = plt.Circle((0, 0), r_max, color="black", fill=False, linewidth=0.2)
+    ax.add_patch(circle)
 
     return fig, 'white'
 
@@ -298,7 +310,7 @@ def create_artwork(location, style_name, magnitude, fov, azimuth, altitude):
     # Add information text (use first axis if available)
     ax = fig.axes[0] if len(fig.axes) > 0 else None
     if ax is not None:
-        add_info_text(fig, ax, location, obs_time, magnitude, fov, azimuth, altitude)
+        add_info_text(fig, ax, location, obs_time, magnitude, fov, azimuth, altitude, bg_color)
 
     # Save artwork
     date_stamp = obs_time.strftime('%Y%m%d')
@@ -332,7 +344,7 @@ def main(locations_file="stargazing-locations.json"):
     fovs = [180]
     azimuths = [0]
     altitudes = [90]
-    magnitudes = [3.5]
+    magnitudes = [3.5, 6.0, 10.0]
 
     total = len(locations) * len(STYLES) * len(fovs) * len(azimuths) * len(altitudes) * len(magnitudes)
     current = 0
