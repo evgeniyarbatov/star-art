@@ -461,6 +461,246 @@ def sand_ripples_style(stars, fov):
 
     return fig, '#ebe8e0'
 
+@style('sumi')
+def sumi_style(stars, fov):
+    """Sumi-e single brush stroke aesthetic"""
+    if stars is None or stars.get('count', 0) == 0:
+        return None, 'white'
+
+    fig, ax = plt.subplots(figsize=(12, 12), facecolor='#fdfdf9', dpi=300)
+    ax.set_facecolor('#fdfdf9')
+    ax.set_aspect('equal')
+
+    radii = np.sqrt(stars['x']**2 + stars['y']**2)
+    r_max = np.max(radii) * 1.0
+
+    # Single stroke aesthetic - varying ink density
+    sizes = 40 * np.exp(-stars['mag'] / 2.2)
+    alphas = np.clip(0.9 - (stars['mag'] - np.min(stars['mag'])) / 12, 0.3, 0.9)
+    
+    ax.scatter(stars['x'], stars['y'], s=sizes, c='#1a1a1a', 
+              alpha=alphas, linewidths=0)
+
+    ax.set_xlim(-r_max, r_max)
+    ax.set_ylim(-r_max, r_max)
+    ax.axis('off')
+
+    circle = plt.Circle((0, 0), r_max, color="#1a1a1a", fill=False, linewidth=0.25)
+    ax.add_patch(circle)
+
+    return fig, '#fdfdf9'
+
+
+@style('ma')
+def ma_style(stars, fov):
+    """Ma (negative space) - celebrating emptiness"""
+    if stars is None or stars.get('count', 0) == 0:
+        return None, 'white'
+
+    fig, ax = plt.subplots(figsize=(12, 12), facecolor='#fafafa', dpi=300)
+    ax.set_facecolor('#fafafa')
+    ax.set_aspect('equal')
+
+    radii = np.sqrt(stars['x']**2 + stars['y']**2)
+    r_max = np.max(radii) * 1.0
+
+    # Only brightest stars - emphasize empty space
+    bright_mask = stars['mag'] <= 4.0
+    if np.any(bright_mask):
+        x_bright = stars['x'][bright_mask]
+        y_bright = stars['y'][bright_mask]
+        mag_bright = stars['mag'][bright_mask]
+        
+        sizes = 15 * np.exp(-mag_bright / 2.0)
+        ax.scatter(x_bright, y_bright, s=sizes, c='#2a2a2a', 
+                  alpha=0.75, linewidths=0)
+
+    ax.set_xlim(-r_max, r_max)
+    ax.set_ylim(-r_max, r_max)
+    ax.axis('off')
+
+    circle = plt.Circle((0, 0), r_max, color="#2a2a2a", fill=False, linewidth=0.2)
+    ax.add_patch(circle)
+
+    return fig, '#fafafa'
+
+
+@style('ukiyo')
+def ukiyo_style(stars, fov):
+    """Ukiyo-e woodblock print aesthetic"""
+    if stars is None or stars.get('count', 0) == 0:
+        return None, 'white'
+
+    fig, ax = plt.subplots(figsize=(12, 12), facecolor='#f8f6f0', dpi=300)
+    ax.set_facecolor('#f8f6f0')
+    ax.set_aspect('equal')
+
+    radii = np.sqrt(stars['x']**2 + stars['y']**2)
+    r_max = np.max(radii) * 1.0
+
+    # Flat, bold marks like woodblock prints
+    sizes = 60 * np.exp(-stars['mag'] / 2.0)
+    
+    ax.scatter(stars['x'], stars['y'], s=sizes, c='#2d2d2d', 
+              alpha=0.95, linewidths=0)
+
+    ax.set_xlim(-r_max, r_max)
+    ax.set_ylim(-r_max, r_max)
+    ax.axis('off')
+
+    circle = plt.Circle((0, 0), r_max, color="#2d2d2d", fill=False, linewidth=0.4)
+    ax.add_patch(circle)
+
+    return fig, '#f8f6f0'
+
+
+@style('shizen')
+def shizen_style(stars, fov):
+    """Shizen (naturalness) - unforced beauty"""
+    if stars is None or stars.get('count', 0) == 0:
+        return None, 'white'
+
+    fig, ax = plt.subplots(figsize=(12, 12), facecolor='#f5f5f5', dpi=300)
+    ax.set_facecolor('#f5f5f5')
+    ax.set_aspect('equal')
+
+    radii = np.sqrt(stars['x']**2 + stars['y']**2)
+    r_max = np.max(radii) * 1.0
+
+    # Natural, organic size variation
+    sizes = 45 * np.exp(-stars['mag'] / 2.3)
+    
+    ax.scatter(stars['x'], stars['y'], s=sizes, c='#333333', 
+              alpha=0.8, linewidths=0)
+
+    ax.set_xlim(-r_max, r_max)
+    ax.set_ylim(-r_max, r_max)
+    ax.axis('off')
+
+    circle = plt.Circle((0, 0), r_max, color="#333333", fill=False, linewidth=0.2)
+    ax.add_patch(circle)
+
+    return fig, '#f5f5f5'
+
+
+@style('seijaku')
+def seijaku_style(stars, fov):
+    """Seijaku (tranquility) - still and solitary"""
+    if stars is None or stars.get('count', 0) == 0:
+        return None, 'white'
+
+    fig, ax = plt.subplots(figsize=(12, 12), facecolor='#fcfcfc', dpi=300)
+    ax.set_facecolor('#fcfcfc')
+    ax.set_aspect('equal')
+
+    radii = np.sqrt(stars['x']**2 + stars['y']**2)
+    r_max = np.max(radii) * 1.0
+
+    # Very subtle, creating stillness
+    sizes = 30 * np.exp(-stars['mag'] / 2.5)
+    alphas = np.clip(0.7 - (stars['mag'] - np.min(stars['mag'])) / 15, 0.4, 0.7)
+    
+    ax.scatter(stars['x'], stars['y'], s=sizes, c='#3a3a3a', 
+              alpha=alphas, linewidths=0)
+
+    ax.set_xlim(-r_max, r_max)
+    ax.set_ylim(-r_max, r_max)
+    ax.axis('off')
+
+    circle = plt.Circle((0, 0), r_max, color="#3a3a3a", fill=False, linewidth=0.15)
+    ax.add_patch(circle)
+
+    return fig, '#fcfcfc'
+
+
+@style('kanso')
+def kanso_style(stars, fov):
+    """Kanso (simplicity) - eliminate clutter"""
+    if stars is None or stars.get('count', 0) == 0:
+        return None, 'white'
+
+    fig, ax = plt.subplots(figsize=(12, 12), facecolor='white', dpi=300)
+    ax.set_facecolor('white')
+    ax.set_aspect('equal')
+
+    radii = np.sqrt(stars['x']**2 + stars['y']**2)
+    r_max = np.max(radii) * 1.0
+
+    # Pure simplicity - uniform size, high contrast
+    sizes = 25 * np.exp(-stars['mag'] / 2.0)
+    
+    ax.scatter(stars['x'], stars['y'], s=sizes, c='black', 
+              alpha=0.9, linewidths=0)
+
+    ax.set_xlim(-r_max, r_max)
+    ax.set_ylim(-r_max, r_max)
+    ax.axis('off')
+
+    circle = plt.Circle((0, 0), r_max, color="black", fill=False, linewidth=0.25)
+    ax.add_patch(circle)
+
+    return fig, 'white'
+
+
+@style('yugen')
+def yugen_style(stars, fov):
+    """Yugen (profound grace) - subtle profundity"""
+    if stars is None or stars.get('count', 0) == 0:
+        return None, 'white'
+
+    fig, ax = plt.subplots(figsize=(12, 12), facecolor='#f9f9f7', dpi=300)
+    ax.set_facecolor('#f9f9f7')
+    ax.set_aspect('equal')
+
+    radii = np.sqrt(stars['x']**2 + stars['y']**2)
+    r_max = np.max(radii) * 1.0
+
+    # Mysterious, suggestive quality
+    sizes = 35 * np.exp(-stars['mag'] / 2.4)
+    alphas = np.clip(0.65 - (stars['mag'] - np.min(stars['mag'])) / 18, 0.25, 0.65)
+    
+    ax.scatter(stars['x'], stars['y'], s=sizes, c='#2a2a2a', 
+              alpha=alphas, linewidths=0)
+
+    ax.set_xlim(-r_max, r_max)
+    ax.set_ylim(-r_max, r_max)
+    ax.axis('off')
+
+    circle = plt.Circle((0, 0), r_max, color="#2a2a2a", fill=False, linewidth=0.2)
+    ax.add_patch(circle)
+
+    return fig, '#f9f9f7'
+
+
+@style('mono_no_aware')
+def mono_no_aware_style(stars, fov):
+    """Mono no aware (pathos of things) - bittersweet impermanence"""
+    if stars is None or stars.get('count', 0) == 0:
+        return None, 'white'
+
+    fig, ax = plt.subplots(figsize=(12, 12), facecolor='#faf9f5', dpi=300)
+    ax.set_facecolor('#faf9f5')
+    ax.set_aspect('equal')
+
+    radii = np.sqrt(stars['x']**2 + stars['y']**2)
+    r_max = np.max(radii) * 1.0
+
+    # Gentle, ephemeral quality
+    sizes = 40 * np.exp(-stars['mag'] / 2.2)
+    alphas = np.clip(0.75 - (stars['mag'] - np.min(stars['mag'])) / 14, 0.35, 0.75)
+    
+    ax.scatter(stars['x'], stars['y'], s=sizes, c='#3d3d3d', 
+              alpha=alphas, linewidths=0)
+
+    ax.set_xlim(-r_max, r_max)
+    ax.set_ylim(-r_max, r_max)
+    ax.axis('off')
+
+    circle = plt.Circle((0, 0), r_max, color="#3d3d3d", fill=False, linewidth=0.2)
+    ax.add_patch(circle)
+
+    return fig, '#faf9f5'
+
 def create_artwork(location, style_name, magnitude, fov, azimuth, altitude):
     """Create star map artwork for a single location and parameter set."""
     start_time = time.time()
