@@ -1,0 +1,92 @@
+[
+  {
+    "name": "Mauna Kea Observatory, Hawaii, USA",
+    "lat": 19.8207,
+    "lon": -155.4681,
+    "description": "High altitude, minimal light pollution, tropical latitude"
+  },
+  {
+    "name": "Atacama Desert, Chile",
+    "lat": -23.8632,
+    "lon": -69.2533,
+    "description": "Driest place on Earth, exceptional southern sky views"
+  },
+  {
+    "name": "South Pole Station, Antarctica",
+    "lat": -90.0,
+    "lon": 0.0,
+    "description": "Continuous night in winter, complete southern celestial pole view"
+  },
+  {
+    "name": "North Pole, Arctic Ocean",
+    "lat": 90.0,
+    "lon": 0.0,
+    "description": "Northern celestial pole directly overhead"
+  },
+  {
+    "name": "Svalbard, Norway",
+    "lat": 78.2232,
+    "lon": 15.6267,
+    "description": "Polar night, aurora viewing, high northern latitude"
+  },
+  {
+    "name": "La Palma Observatory, Canary Islands, Spain",
+    "lat": 28.7574,
+    "lon": -17.8850,
+    "description": "Protected dark sky site, subtropical views"
+  },
+  {
+    "name": "Aoraki Mackenzie Dark Sky Reserve, New Zealand",
+    "lat": -43.9869,
+    "lon": 170.4653,
+    "description": "Southern hemisphere gold-tier dark sky reserve"
+  },
+  {
+    "name": "Equator - Quito, Ecuador",
+    "lat": 0.0,
+    "lon": -78.4678,
+    "description": "Views of both celestial hemispheres year-round"
+  },
+  {
+    "name": "Uluru, Northern Territory, Australia",
+    "lat": -25.3444,
+    "lon": 131.0369,
+    "description": "Outback darkness, Southern Cross prominent"
+  },
+  {
+    "name": "Namib Desert, Namibia",
+    "lat": -24.7906,
+    "lon": 15.9667,
+    "description": "Dark African skies, excellent Milky Way views"
+  },
+  {
+    "name": "Jasper Dark Sky Preserve, Canada",
+    "lat": 52.8734,
+    "lon": -117.9543,
+    "description": "Large northern dark sky preserve"
+  },
+  {
+    "name": "Tropic of Cancer - Saudi Arabia",
+    "lat": 23.4378,
+    "lon": 45.0833,
+    "description": "Transition between temperate and tropical sky views"
+  },
+  {
+    "name": "Iceland",
+    "lat": 64.9631,
+    "lon": -19.0208,
+    "description": "Aurora borealis, midnight sun phenomena"
+  },
+  {
+    "name": "Paranal Observatory, Chile",
+    "lat": -24.6275,
+    "lon": -70.4044,
+    "description": "VLT site, exceptional southern celestial views"
+  },
+  {
+    "name": "Cherry Springs State Park, Pennsylvania, USA",
+    "lat": 41.6631,
+    "lon": -77.8228,
+    "description": "Mid-northern latitude dark sky park"
+  }
+]
