@@ -599,7 +599,8 @@ def create_artwork(location, style_name, magnitude, fov, azimuth, altitude):
     # Save artwork
     date_stamp = obs_time.strftime('%Y%m%d')
     safe_name = name.replace(' ', '_').replace(',', '_')
-    filename = (f"{IMAGES_DIR}/{safe_name}_{style_name}_"
+    os.makedirs(f"{IMAGES_DIR}/{style_name}", exist_ok=True)
+    filename = (f"{IMAGES_DIR}/{style_name}/{safe_name}_"
                 f"mag{magnitude}_fov{fov}_az{azimuth}_alt{altitude}_{date_stamp}.png")
 
     try:
