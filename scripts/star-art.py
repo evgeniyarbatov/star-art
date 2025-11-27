@@ -3,19 +3,25 @@ import json
 import os
 import numpy as np
 import matplotlib.pyplot as plt
-from datetime import datetime
+from datetime import datetime, timedelta, time as dtime
 import pytz
-
 from skyfield.api import load, wgs84, Star
 from skyfield.data import hipparcos
-from scipy.spatial import Delaunay
+from astral import Observer
+from astral.sun import sun
+from timezonefinder import TimezoneFinder
 
 # Global registry for styles
 STYLES = {}
 IMAGES_DIR = "images"
+TF = TimezoneFinder()
 
 # Create output directory
 os.makedirs(IMAGES_DIR, exist_ok=True)
+
+# Load heavy catalogs once
+_HIPPARCOS_DF = None
+
 
 def style(name):
     """Decorator to register a style function"""
@@ -24,279 +30,328 @@ def style(name):
         return func
     return decorator
 
-def stereographic_project(alt, az):
-    """Project alt/az to 2D using stereographic projection"""
-    alt_rad = np.radians(alt.degrees)
-    az_rad = np.radians(az.degrees)
-    
-    # Stereographic projection from south pole
-    r = 2 * np.tan((np.pi/2 - alt_rad) / 2)
-    x = r * np.sin(az_rad)
-    y = r * np.cos(az_rad)
-    
-    return x, y
 
-def get_visible_stars(observer, obs_time, magnitude_limit, min_altitude=0):
-    """Get stars visible from observer location at given time"""
-    ts = load.timescale()
-    
-    # Load Hipparcos catalog
-    print(f"Loading Hipparcos star catalog...")
-    with load.open(hipparcos.URL) as f:
-        df = hipparcos.load_dataframe(f)
-    
+def add_info_text(fig, ax, location, obs_time, magnitude, fov, azimuth, altitude):
+    """Add information text at bottom of image
+
+    fig, ax: matplotlib figure and axis
+    location: dict with 'lat','lon','name' optional
+    obs_time: aware datetime (UTC)
+    magnitude, fov, azimuth, altitude: numeric
+    """
+    name = location.get('name', 'Unknown') if isinstance(location, dict) else str(location)
+    lat = location.get('lat', 0.0)
+    lon = location.get('lon', 0.0)
+
+    # Get exact timezone for location
+    tz_name = TF.timezone_at(lat=lat, lng=lon)
+    if tz_name:
+        try:
+            tz = pytz.timezone(tz_name)
+            local_time = obs_time.astimezone(tz)
+            time_str = local_time.strftime('%Y-%m-%d %H:%M %Z')
+        except Exception:
+            # Fallback
+            time_str = obs_time.strftime('%Y-%m-%d %H:%M UTC')
+    else:
+        time_str = obs_time.strftime('%Y-%m-%d %H:%M UTC')
+
+    info_text = (f"{name}  |  {lat:.2f}°, {lon:.2f}°  |  "
+                 f"{time_str}  |  "
+                 f"Mag ≤{magnitude}  |  FOV {fov}°  |  Az {azimuth}°  Alt {altitude}°")
+
+    # Use figure text so it is placed relative to the full canvas
+    fig.text(0.5, 0.02, info_text, ha='center', fontsize=9,
+             family='monospace', weight='normal')
+
+
+def stereographic_project(alt, az, center_alt, center_az, fov):
+    """Project arrays of alt (deg) and az (deg) to 2D using stereographic projection
+
+    Returns (x, y, mask) where x,y are numpy arrays and mask is a boolean array
+    indicating which points lie within the FOV (angular distance <= fov/2).
+    If no points in FOV returns (None, None, mask).
+    """
+    # Convert inputs to numpy arrays
+    alt = np.asarray(alt, dtype=float)
+    az = np.asarray(az, dtype=float)
+
+    # Convert degrees to radians
+    alt_rad = np.radians(alt)
+    az_rad = np.radians(az)
+    center_alt_rad = np.radians(float(center_alt))
+    center_az_rad = np.radians(float(center_az))
+
+    # Convert to Cartesian coordinates on unit sphere
+    x1 = np.cos(alt_rad) * np.sin(az_rad)
+    y1 = np.cos(alt_rad) * np.cos(az_rad)
+    z1 = np.sin(alt_rad)
+
+    x_c = np.cos(center_alt_rad) * np.sin(center_az_rad)
+    y_c = np.cos(center_alt_rad) * np.cos(center_az_rad)
+    z_c = np.sin(center_alt_rad)
+
+    # Dot product = cos(angular distance)
+    cos_dist = x1 * x_c + y1 * y_c + z1 * z_c
+    cos_dist = np.clip(cos_dist, -1.0, 1.0)
+    angular_dist = np.degrees(np.arccos(cos_dist))
+
+    # Mask by FOV (angular distance from center)
+    mask = angular_dist <= (float(fov) / 2.0)
+
+    if not np.any(mask):
+        return None, None, mask
+
+    # Stereographic projection factor (vectorized)
+    # avoid division by zero when cos_dist == -1
+    denom = 1.0 + cos_dist
+    denom[denom == 0] = 1e-12
+    k = 2.0 / denom
+
+    # Projected coordinates relative to center direction
+    dx = x1 - x_c
+    dy = y1 - y_c
+
+    x = k * dx
+    y = k * dy
+
+    return x, y, mask
+
+
+def get_astronomical_dusk(lat, lon, date):
+    """Get astronomical dusk time (UTC) for a given date and lat/lon.
+
+    Uses astral's Observer/sun. Returns an aware datetime in UTC.
+    If calculation fails, returns a sensible fallback (20:00 UTC on that date).
+    """
+    try:
+        observer = Observer(latitude=float(lat), longitude=float(lon), elevation=0)
+        s = sun(observer, date=date, tzinfo=pytz.UTC)
+        # Astronomical dusk key can be 'dusk' depending on astral version; fall back to 'sunset' + 2h
+        if 'dusk' in s and s['dusk'] is not None:
+            return s['dusk']
+        # if dusk not provided, use sunset + 2 hours as a reasonable proxy
+        if 'sunset' in s and s['sunset'] is not None:
+            return s['sunset'] + timedelta(hours=2)
+    except Exception as e:
+        print(f"Could not calculate dusk using astral: {e}")
+
+    # Fallback to 20:00 UTC on that date
+    try:
+        fallback = datetime.combine(date, dtime(hour=20, minute=0), tzinfo=pytz.UTC)
+        return fallback
+    except Exception:
+        # Last resort: now
+        return datetime.now(pytz.UTC)
+
+
+def _load_hipparcos():
+    """Load Hipparcos catalog into global variable (cached)."""
+    global _HIPPARCOS_DF
+    if _HIPPARCOS_DF is not None:
+        return _HIPPARCOS_DF
+
+    ts_local = load.timescale()
+    try:
+        print("Loading Hipparcos star catalog (this may take a moment)...")
+        with load.open(hipparcos.URL) as f:
+            _HIPPARCOS_DF = hipparcos.load_dataframe(f)
+    except Exception as e:
+        print(f"Failed to load Hipparcos catalog: {e}")
+        _HIPPARCOS_DF = None
+
+    return _HIPPARCOS_DF
+
+
+def get_visible_stars(observer, obs_time, magnitude_limit, center_alt, center_az, fov):
+    """Get stars visible from observer location at given time within FOV.
+
+    Returns dict with 'x','y','mag','count' or None if none visible.
+    """
+    # Ensure catalog is loaded
+    df = _load_hipparcos()
+    if df is None or len(df) == 0:
+        print("Hipparcos catalog not available.")
+        return None
+
     # Filter by magnitude
-    visible_df = df[df['magnitude'] <= magnitude_limit].copy()
-    print(f"Found {len(visible_df)} stars with magnitude ≤ {magnitude_limit}")
-    
-    # Create star objects
-    stars = Star.from_dataframe(visible_df)
-    
-    # Observe from location
-    t = ts.from_datetime(obs_time)
+    visible_df = df[df['magnitude'] <= float(magnitude_limit)].copy()
+    if len(visible_df) == 0:
+        return None
+
+    # Create Skyfield Star objects
+    try:
+        stars = Star.from_dataframe(visible_df)
+    except Exception as e:
+        print(f"Error creating Star objects: {e}")
+        return None
+
+    # Observe from location/time
+    ts = load.timescale()
+    try:
+        t = ts.from_datetime(obs_time)
+    except Exception:
+        # Ensure obs_time is timezone-aware in UTC
+        if obs_time.tzinfo is None:
+            obs_time = obs_time.replace(tzinfo=pytz.UTC)
+        t = ts.from_datetime(obs_time)
+
     astrometric = observer.at(t).observe(stars)
-    alt, az, distance = astrometric.apparent().altaz()
-    
-    # Filter by altitude
-    mask = alt.degrees > min_altitude
-    
+    app = astrometric.apparent()
+    alt, az, distance = app.altaz()
+
+    # Convert to numpy arrays (degrees)
+    alt_deg = np.asarray(alt.degrees)
+    az_deg = np.asarray(az.degrees)
+
+    # Project to 2D with FOV filtering
+    x, y, mask = stereographic_project(alt_deg, az_deg, center_alt, center_az, fov)
+
+    if x is None:
+        return None
+
+    # Apply mask to magnitudes
+    mags = np.asarray(visible_df['magnitude'].values)
+
+    # Ensure mask length equals mags length
+    if mask.shape[0] != mags.shape[0]:
+        # In case shapes mismatch for any reason, try to broadcast sensibly
+        minlen = min(mask.shape[0], mags.shape[0])
+        mask = mask[:minlen]
+        mags = mags[:minlen]
+        x = x[:minlen]
+        y = y[:minlen]
+
     return {
-        'alt': alt.degrees[mask],
-        'az': az.degrees[mask],
-        'mag': visible_df['magnitude'].values[mask],
-        'count': np.sum(mask)
+        'x': x[mask],
+        'y': y[mask],
+        'mag': mags[mask],
+        'count': int(np.sum(mask))
     }
 
+
 @style('minimal')
-def minimal_style(observer, obs_time, magnitude, min_alt):
+def minimal_style(stars, fov):
     """Minimalistic black stars on white background"""
-    stars = get_visible_stars(observer, obs_time, magnitude, min_alt)
-    
-    if stars['count'] == 0:
-        print("No visible stars found")
+    if stars is None or stars.get('count', 0) == 0:
         return None, 'white'
-    
-    # Project to 2D
-    x, y = stereographic_project(stars['alt'], stars['az'])
-    
-    # Star sizes based on magnitude (brighter = bigger)
+
     sizes = 50 * np.exp(-stars['mag'] / 2.5)
-    
-    # Create figure
+
     fig, ax = plt.subplots(figsize=(12, 12), facecolor='white', dpi=300)
     ax.set_facecolor('white')
     ax.set_aspect('equal')
-    
-    # Plot stars
-    ax.scatter(x, y, s=sizes, c='black', alpha=0.9, linewidths=0)
-    
-    # Add horizon circle
-    circle = plt.Circle((0, 0), 2, fill=False, color='black', linewidth=1, alpha=0.3)
-    ax.add_patch(circle)
-    
-    ax.set_xlim(-2.2, 2.2)
-    ax.set_ylim(-2.2, 2.2)
+
+    ax.scatter(stars['x'], stars['y'], s=sizes, c='black', alpha=0.9, linewidths=0)
+
+    limit = fov / 50.0
+    ax.set_xlim(-limit, limit)
+    ax.set_ylim(-limit, limit)
     ax.axis('off')
-    
+
     return fig, 'white'
 
-@style('colorful')
-def colorful_style(observer, obs_time, magnitude, min_alt):
-    """Colorful stars with gradient colors"""
-    stars = get_visible_stars(observer, obs_time, magnitude, min_alt)
-    
-    if stars['count'] == 0:
-        return None, '#0a0e27'
-    
-    x, y = stereographic_project(stars['alt'], stars['az'])
-    sizes = 60 * np.exp(-stars['mag'] / 2.5)
-    
-    # Create figure with dark blue background
-    fig, ax = plt.subplots(figsize=(12, 12), facecolor='#0a0e27', dpi=300)
-    ax.set_facecolor('#0a0e27')
-    ax.set_aspect('equal')
-    
-    # Color based on magnitude (bright stars = warm colors)
-    colors = plt.cm.plasma(1 - (stars['mag'] - stars['mag'].min()) / 
-                           (stars['mag'].max() - stars['mag'].min() + 0.1))
-    
-    # Plot stars with glow effect
-    for i in range(len(x)):
-        ax.scatter(x[i], y[i], s=sizes[i]*2, c=[colors[i]], alpha=0.2, linewidths=0)
-        ax.scatter(x[i], y[i], s=sizes[i], c=[colors[i]], alpha=0.8, linewidths=0)
-    
-    ax.set_xlim(-2.2, 2.2)
-    ax.set_ylim(-2.2, 2.2)
-    ax.axis('off')
-    
-    return fig, '#0a0e27'
-
-@style('neon')
-def neon_style(observer, obs_time, magnitude, min_alt):
-    """Neon/cyberpunk style with bright colors on black"""
-    stars = get_visible_stars(observer, obs_time, magnitude, min_alt)
-    
-    if stars['count'] == 0:
-        return None, 'black'
-    
-    x, y = stereographic_project(stars['alt'], stars['az'])
-    sizes = 40 * np.exp(-stars['mag'] / 2.5)
-    
-    fig, ax = plt.subplots(figsize=(12, 12), facecolor='black', dpi=300)
-    ax.set_facecolor('black')
-    ax.set_aspect('equal')
-    
-    # Neon colors - cyan, magenta, yellow
-    neon_colors = ['#00ffff', '#ff00ff', '#ffff00', '#00ff88', '#ff0088']
-    colors = [neon_colors[i % len(neon_colors)] for i in range(len(x))]
-    
-    # Plot with strong glow
-    for i in range(len(x)):
-        ax.scatter(x[i], y[i], s=sizes[i]*4, c=colors[i], alpha=0.1, linewidths=0)
-        ax.scatter(x[i], y[i], s=sizes[i]*2, c=colors[i], alpha=0.3, linewidths=0)
-        ax.scatter(x[i], y[i], s=sizes[i], c=colors[i], alpha=0.9, linewidths=0)
-    
-    ax.set_xlim(-2.2, 2.2)
-    ax.set_ylim(-2.2, 2.2)
-    ax.axis('off')
-    
-    return fig, 'black'
-
-@style('watercolor')
-def watercolor_style(observer, obs_time, magnitude, min_alt):
-    """Soft watercolor style with pastel colors"""
-    stars = get_visible_stars(observer, obs_time, magnitude, min_alt)
-    
-    if stars['count'] == 0:
-        return None, '#f5f5dc'
-    
-    x, y = stereographic_project(stars['alt'], stars['az'])
-    sizes = 80 * np.exp(-stars['mag'] / 2.5)
-    
-    fig, ax = plt.subplots(figsize=(12, 12), facecolor='#f5f5dc', dpi=300)
-    ax.set_facecolor('#f5f5dc')
-    ax.set_aspect('equal')
-    
-    # Soft pastel colors
-    colors = plt.cm.Pastel1(np.random.rand(len(x)))
-    
-    # Plot with watercolor effect (multiple layers)
-    for i in range(len(x)):
-        ax.scatter(x[i], y[i], s=sizes[i]*3, c=[colors[i]], alpha=0.1, linewidths=0)
-        ax.scatter(x[i], y[i], s=sizes[i]*1.5, c=[colors[i]], alpha=0.2, linewidths=0)
-        ax.scatter(x[i], y[i], s=sizes[i]*0.5, c=[colors[i]], alpha=0.4, linewidths=0)
-    
-    ax.set_xlim(-2.2, 2.2)
-    ax.set_ylim(-2.2, 2.2)
-    ax.axis('off')
-    
-    return fig, '#f5f5dc'
-
-@style('constellation')
-def constellation_style(observer, obs_time, magnitude, min_alt):
-    """Connect nearby stars like constellations"""
-    stars = get_visible_stars(observer, obs_time, magnitude, min_alt)
-    
-    if stars['count'] == 0:
-        return None, '#001133'
-    
-    x, y = stereographic_project(stars['alt'], stars['az'])
-    sizes = 30 * np.exp(-stars['mag'] / 2.5)
-    
-    fig, ax = plt.subplots(figsize=(12, 12), facecolor='#001133', dpi=300)
-    ax.set_facecolor('#001133')
-    ax.set_aspect('equal')
-    
-    # Connect nearby stars
-    if len(x) > 3:
-        points = np.column_stack([x, y])
-        tri = Delaunay(points)
-        
-        # Only draw short connections
-        for simplex in tri.simplices:
-            for i in range(3):
-                p1 = points[simplex[i]]
-                p2 = points[simplex[(i+1)%3]]
-                dist = np.linalg.norm(p1 - p2)
-                if dist < 0.3:  # Only nearby stars
-                    ax.plot([p1[0], p2[0]], [p1[1], p2[1]], 
-                           'white', alpha=0.2, linewidth=0.5)
-    
-    # Plot stars
-    ax.scatter(x, y, s=sizes, c='white', alpha=0.9, linewidths=0)
-    
-    ax.set_xlim(-2.2, 2.2)
-    ax.set_ylim(-2.2, 2.2)
-    ax.axis('off')
-    
-    return fig, '#001133'
-
-def create_artwork(location, style_name, magnitude, date_str=None):
-    """Create star map artwork for a location"""
+def create_artwork(location, style_name, magnitude, fov, azimuth, altitude):
+    """Create star map artwork for a single location and parameter set."""
     start_time = time.time()
-    
-    # Setup observer
-    ts = load.timescale()
+
+    # Load ephemeris and observer
     planets = load('de421.bsp')
     earth = planets['earth']
-    
-    lat = location['lat']
-    lon = location['lon']
+
+    lat = float(location['lat'])
+    lon = float(location['lon'])
     name = location.get('name', f"{lat},{lon}")
-    
+
     observer = earth + wgs84.latlon(lat, lon)
-    
-    # Use provided date or current time
-    if date_str:
-        obs_time = datetime.fromisoformat(date_str)
-    else:
-        obs_time = datetime.now(pytz.UTC)
-    
-    # Generate artwork
-    print(f"\nGenerating {style_name} artwork for {name}...")
-    print(f"Date: {obs_time.strftime('%Y-%m-%d %H:%M UTC')}")
-    
+
+    # Determine observation time (astronomical dusk for today)
+    today = datetime.now(pytz.UTC).date()
+    obs_time = get_astronomical_dusk(lat, lon, today)
+
+    print(f"\nGenerating '{style_name}' for {name} at astronomical dusk (UTC): {obs_time.strftime('%Y-%m-%d %H:%M UTC')}")
+
+    # Get visible stars: center_alt = altitude, center_az = azimuth
+    stars = get_visible_stars(observer, obs_time, magnitude, altitude, azimuth, fov)
+
+    if stars is None or stars.get('count', 0) == 0:
+        print("No stars visible in this FOV, skipping...")
+        return
+
+    print(f"Stars in FOV: {stars['count']}")
+
+    # Generate artwork using selected style
     if style_name not in STYLES:
         print(f"Error: Style '{style_name}' not found")
         return
-    
-    fig, bg_color = STYLES[style_name](observer, obs_time, magnitude, min_alt=10)
-    
-    if fig is None:
-        print("No stars visible, skipping...")
+
+    fig_bg = STYLES[style_name](stars, fov)
+    if fig_bg is None:
+        print("Failed to generate artwork (style returned None).")
         return
-    
+
+    fig, bg_color = fig_bg
+    if fig is None:
+        print("Failed to generate artwork, skipping...")
+        return
+
+    # Add information text (use first axis if available)
+    ax = fig.axes[0] if len(fig.axes) > 0 else None
+    if ax is not None:
+        add_info_text(fig, ax, location, obs_time, magnitude, fov, azimuth, altitude)
+
     # Save artwork
     date_stamp = obs_time.strftime('%Y%m%d')
     safe_name = name.replace(' ', '_').replace(',', '_')
-    filename = f"{IMAGES_DIR}/{safe_name}_{style_name}_mag{magnitude}_{date_stamp}.png"
-    
-    fig.tight_layout(pad=0)
-    plt.savefig(filename, dpi=300, facecolor=bg_color, 
-                edgecolor='none', bbox_inches='tight')
-    plt.close()
-    
-    duration = time.time() - start_time
-    print(f"✓ Saved: {filename} ({duration:.2f}s)")
+    filename = (f"{IMAGES_DIR}/{safe_name}_{style_name}_"
+                f"mag{magnitude}_fov{fov}_az{azimuth}_alt{altitude}_{date_stamp}.png")
 
-def main():
-    with open("stargazing-locations.json", "r") as f:
-        locations = json.load(f)
-    
+    try:
+        fig.tight_layout(pad=0.5)
+        plt.savefig(filename, dpi=300, facecolor=bg_color, edgecolor='none', bbox_inches='tight')
+        plt.close(fig)
+        duration = time.time() - start_time
+        print(f"✓ Saved: {filename} ({duration:.2f}s)")
+    except Exception as e:
+        print(f"Error saving figure: {e}")
+
+
+def main(locations_file="stargazing-locations.json"):
+    # Load locations from file
+    try:
+        with open(locations_file, "r") as f:
+            locations = json.load(f)
+    except Exception as e:
+        print(f"Could not load locations file '{locations_file}': {e}")
+        return
+
     print(f"Available styles: {', '.join(sorted(STYLES.keys()))}")
     print(f"\nGenerating artworks for {len(locations)} locations...")
-    
-    # Generate artworks
+
+    # Parameters to vary
+    fovs = [180]
+    azimuths = [0]
+    altitudes = [90]
+    magnitudes = [3.5]
+
+    total = len(locations) * len(STYLES) * len(fovs) * len(azimuths) * len(altitudes) * len(magnitudes)
+    current = 0
+
     for location in locations:
         for style_name in sorted(STYLES.keys()):
-            # Create with different magnitude limits
-            for magnitude in [3.5, 6.0]:
-                try:
-                    create_artwork(location, style_name, magnitude)
-                except Exception as e:
-                    print(f"Error creating {style_name} for {location.get('name')}: {e}")
-    
-    print(f"\n✓ All artworks saved to {IMAGES_DIR}/")
+            for fov in fovs:
+                for azimuth in azimuths:
+                    for altitude in altitudes:
+                        for magnitude in magnitudes:
+                            current += 1
+                            print(f"\n[{current}/{total}]", end=" ")
+                            try:
+                                create_artwork(location, style_name, magnitude, fov, azimuth, altitude)
+                            except Exception as e:
+                                print(f"Error: {e}")
+
+    print(f"\n✓ All artworks (attempted) saved to {IMAGES_DIR}/")
+
 
 if __name__ == "__main__":
     main()

@@ -15,3 +15,6 @@ install: venv
 
 art:
 	@$(PYTHON) scripts/star-art.py
+
+clean:
+	rm images/*.png
