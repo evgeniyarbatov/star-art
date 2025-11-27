@@ -301,13 +301,8 @@ def stones_style(stars, fov):
     # Draw stars as rounded stones
     sizes = 100 * np.exp(-stars['mag'] / 2.0)
     
-    # Shadow layer
-    ax.scatter(stars['x'] + 0.05, stars['y'] - 0.05, s=sizes * 1.1, 
-              c='#3a3a3a', alpha=0.15, linewidths=0)
-    
-    # Stone layer
     ax.scatter(stars['x'], stars['y'], s=sizes, c='#4a4a4a', 
-              alpha=0.9, linewidths=0.5, edgecolors='#2a2a2a')
+              alpha=0.9, linewidths=0)
 
     ax.set_xlim(-r_max, r_max)
     ax.set_ylim(-r_max, r_max)
@@ -317,41 +312,6 @@ def stones_style(stars, fov):
     ax.add_patch(circle)
 
     return fig, '#e8e6e0'
-
-
-@style('breath')
-def breath_style(stars, fov):
-    """Breathing space with minimal marks"""
-    if stars is None or stars.get('count', 0) == 0:
-        return None, 'white'
-
-    fig, ax = plt.subplots(figsize=(12, 12), facecolor='white', dpi=300)
-    ax.set_facecolor('white')
-    ax.set_aspect('equal')
-
-    radii = np.sqrt(stars['x']**2 + stars['y']**2)
-    r_max = np.max(radii) * 1.0
-
-    # Only show brightest stars
-    bright_mask = stars['mag'] <= 4.5
-    if np.any(bright_mask):
-        x_bright = stars['x'][bright_mask]
-        y_bright = stars['y'][bright_mask]
-        mag_bright = stars['mag'][bright_mask]
-        
-        sizes = 20 * np.exp(-mag_bright / 2.0)
-        ax.scatter(x_bright, y_bright, s=sizes, c='#1a1a1a', 
-                  alpha=0.7, linewidths=0)
-
-    ax.set_xlim(-r_max, r_max)
-    ax.set_ylim(-r_max, r_max)
-    ax.axis('off')
-
-    circle = plt.Circle((0, 0), r_max, color="black", fill=False, linewidth=0.2)
-    ax.add_patch(circle)
-
-    return fig, 'white'
-
 
 @style('wabi_sabi')
 def wabi_sabi_style(stars, fov):
@@ -366,20 +326,11 @@ def wabi_sabi_style(stars, fov):
     radii = np.sqrt(stars['x']**2 + stars['y']**2)
     r_max = np.max(radii) * 1.0
 
-    # Add subtle noise to positions for imperfection
-    noise_x = np.random.normal(0, 0.02, len(stars['x']))
-    noise_y = np.random.normal(0, 0.02, len(stars['y']))
-    
-    x_imperfect = stars['x'] + noise_x
-    y_imperfect = stars['y'] + noise_y
-
-    # Varying sizes with irregularity
-    base_sizes = 25 * np.exp(-stars['mag'] / 2.5)
-    size_variation = np.random.uniform(0.8, 1.2, len(base_sizes))
-    sizes = base_sizes * size_variation
+    # Use actual positions - no noise
+    sizes = 25 * np.exp(-stars['mag'] / 2.5)
 
     # Plot with earth tones
-    ax.scatter(x_imperfect, y_imperfect, s=sizes, c='#3d3d3d', 
+    ax.scatter(stars['x'], stars['y'], s=sizes, c='#3d3d3d', 
               alpha=0.75, linewidths=0)
 
     ax.set_xlim(-r_max, r_max)
@@ -390,76 +341,6 @@ def wabi_sabi_style(stars, fov):
     ax.add_patch(circle)
 
     return fig, '#f0ebe5'
-
-
-@style('haiku')
-def haiku_style(stars, fov):
-    """Three visual elements like haiku's three lines"""
-    if stars is None or stars.get('count', 0) == 0:
-        return None, 'white'
-
-    fig, ax = plt.subplots(figsize=(12, 12), facecolor='#fcfcf8', dpi=300)
-    ax.set_facecolor('#fcfcf8')
-    ax.set_aspect('equal')
-
-    radii = np.sqrt(stars['x']**2 + stars['y']**2)
-    r_max = np.max(radii) * 1.0
-
-    # Select exactly 3 brightest stars or star groups
-    brightest_indices = np.argsort(stars['mag'])[:3]
-    
-    for idx in brightest_indices:
-        x, y, mag = stars['x'][idx], stars['y'][idx], stars['mag'][idx]
-        size = 60 * np.exp(-mag / 2.0)
-        ax.scatter(x, y, s=size, c='#2a2a2a', alpha=0.9, linewidths=0)
-
-    ax.set_xlim(-r_max, r_max)
-    ax.set_ylim(-r_max, r_max)
-    ax.axis('off')
-
-    circle = plt.Circle((0, 0), r_max, color="#2a2a2a", fill=False, linewidth=0.2)
-    ax.add_patch(circle)
-
-    return fig, '#fcfcf8'
-
-
-@style('sand_ripples')
-def sand_ripples_style(stars, fov):
-    """Zen garden raked sand patterns"""
-    if stars is None or stars.get('count', 0) == 0:
-        return None, 'white'
-
-    fig, ax = plt.subplots(figsize=(12, 12), facecolor='#ebe8e0', dpi=300)
-    ax.set_facecolor('#ebe8e0')
-    ax.set_aspect('equal')
-
-    radii = np.sqrt(stars['x']**2 + stars['y']**2)
-    r_max = np.max(radii) * 1.0
-
-    # Draw ripple patterns around brightest stars
-    brightest_indices = np.argsort(stars['mag'])[:5]
-    
-    for idx in brightest_indices:
-        x, y = stars['x'][idx], stars['y'][idx]
-        for ring in range(1, 6):
-            radius = 0.2 * ring
-            circle = plt.Circle((x, y), radius, color='#6a6a6a', 
-                              fill=False, linewidth=0.2, alpha=0.25)
-            ax.add_patch(circle)
-
-    # Plot stars
-    sizes = 35 * np.exp(-stars['mag'] / 2.5)
-    ax.scatter(stars['x'], stars['y'], s=sizes, c='#3a3a3a', 
-              alpha=0.8, linewidths=0)
-
-    ax.set_xlim(-r_max, r_max)
-    ax.set_ylim(-r_max, r_max)
-    ax.axis('off')
-
-    circle = plt.Circle((0, 0), r_max, color="#3a3a3a", fill=False, linewidth=0.2)
-    ax.add_patch(circle)
-
-    return fig, '#ebe8e0'
 
 @style('sumi')
 def sumi_style(stars, fov):
@@ -489,41 +370,6 @@ def sumi_style(stars, fov):
     ax.add_patch(circle)
 
     return fig, '#fdfdf9'
-
-
-@style('ma')
-def ma_style(stars, fov):
-    """Ma (negative space) - celebrating emptiness"""
-    if stars is None or stars.get('count', 0) == 0:
-        return None, 'white'
-
-    fig, ax = plt.subplots(figsize=(12, 12), facecolor='#fafafa', dpi=300)
-    ax.set_facecolor('#fafafa')
-    ax.set_aspect('equal')
-
-    radii = np.sqrt(stars['x']**2 + stars['y']**2)
-    r_max = np.max(radii) * 1.0
-
-    # Only brightest stars - emphasize empty space
-    bright_mask = stars['mag'] <= 4.0
-    if np.any(bright_mask):
-        x_bright = stars['x'][bright_mask]
-        y_bright = stars['y'][bright_mask]
-        mag_bright = stars['mag'][bright_mask]
-        
-        sizes = 15 * np.exp(-mag_bright / 2.0)
-        ax.scatter(x_bright, y_bright, s=sizes, c='#2a2a2a', 
-                  alpha=0.75, linewidths=0)
-
-    ax.set_xlim(-r_max, r_max)
-    ax.set_ylim(-r_max, r_max)
-    ax.axis('off')
-
-    circle = plt.Circle((0, 0), r_max, color="#2a2a2a", fill=False, linewidth=0.2)
-    ax.add_patch(circle)
-
-    return fig, '#fafafa'
-
 
 @style('ukiyo')
 def ukiyo_style(stars, fov):
