@@ -18,3 +18,4 @@ art: clean
 
 clean:
 	find images -mindepth 1 ! -name '.gitignore' -exec rm -rf {} +
+	@rm -rf $(VENV_PATH)
