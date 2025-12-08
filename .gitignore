@@ -1,4 +1,5 @@
-.venv
-de421.bsp*
-hip_main.dat*
 .DS_Store
+.venv
+.ipynb_checkpoints/
+__pycache__/
+.venv/
