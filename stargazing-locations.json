@@ -88,5 +88,65 @@
     "lat": 41.6631,
     "lon": -77.8228,
     "description": "Mid-northern latitude dark sky park"
+  },
+  {
+    "name": "Big Bend National Park, Texas, USA",
+    "lat": 29.1275,
+    "lon": -103.2425,
+    "description": "Remote desert park with exceptionally dark skies, International Dark Sky Park"
+  },
+  {
+    "name": "Bryce Canyon National Park, Utah, USA",
+    "lat": 37.5930,
+    "lon": -112.1873,
+    "description": "High elevation, clear views, famous for hoodoos and astronomy programs"
+  },
+  {
+    "name": "Death Valley National Park, California, USA",
+    "lat": 36.5054,
+    "lon": -117.0794,
+    "description": "One of the darkest places in the US, extreme clarity due to dry air"
+  },
+  {
+    "name": "Galloway Forest Park, Scotland, UK",
+    "lat": 55.1239,
+    "lon": -4.4239,
+    "description": "UK's first Dark Sky Park, excellent for stargazing in Europe"
+  },
+  {
+    "name": "Pic du Midi Observatory, France",
+    "lat": 42.9374,
+    "lon": 0.1411,
+    "description": "High-altitude observatory in the Pyrenees, clear mountain skies"
+  },
+  {
+    "name": "South African Large Telescope (SALT), Sutherland, South Africa",
+    "lat": -32.3758,
+    "lon": 20.8108,
+    "description": "Remote Karoo location, home to southern hemisphere's largest telescope"
+  },
+  {
+    "name": "Hanle, Ladakh, Indian Astronomical Observatory, India",
+    "lat": 32.7792,
+    "lon": 78.9631,
+    "description": "One of the highest observatories, extremely clear high-altitude skies"
+  },
+  {
+    "name": "Wadi Rum, Jordan",
+    "lat": 29.5722,
+    "lon": 35.4200,
+    "description": "Desert landscape with minimal light pollution, Bedouin stargazing"
+  },
+  {
+    "name": "Exmoor National Park, England, UK",
+    "lat": 51.1400,
+    "lon": -3.6200,
+    "description": "Dark sky reserve in UK, moorland with good visibility"
+  },
+  {
+    "name": "Kerry International Dark-Sky Reserve, Ireland",
+    "lat": 51.8833,
+    "lon": -10.2667,
+    "description": "Gold-tier dark sky reserve, only one in Northern Hemisphere"
   }
 ]

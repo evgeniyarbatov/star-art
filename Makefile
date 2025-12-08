@@ -17,4 +17,4 @@ art: clean
 	@$(PYTHON) scripts/star-art.py
 
 clean:
-	rm -f images/*.png
+	find images -mindepth 1 ! -name '.gitignore' -exec rm -rf {} +

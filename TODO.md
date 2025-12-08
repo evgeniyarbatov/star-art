@@ -1,0 +1,2 @@
+- new stargazing locations: try personally meaningful ones
+- 3D: can I imagine how the stars would look like if I look from the side?
