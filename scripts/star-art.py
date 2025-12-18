@@ -25,68 +25,89 @@ _HIPPARCOS_DF = None
 
 def style(name):
     """Decorator to register a style function"""
+
     def decorator(func):
         STYLES[name] = func
         return func
+
     return decorator
 
 
-def add_info_text(fig, ax, location, obs_time, magnitude, fov, azimuth, altitude, bg_color):
+def add_info_text(
+    fig, ax, location, obs_time, magnitude, fov, azimuth, altitude, bg_color
+):
     """Add information text with automatic light/dark contrast."""
-    
+
     # Determine readable text color based on background luminance
     def get_luminance(color):
         """Calculate relative luminance of a color."""
         # Handle hex colors
-        if color.startswith('#'):
-            hex_color = color.lstrip('#')
+        if color.startswith("#"):
+            hex_color = color.lstrip("#")
             if len(hex_color) == 6:
-                r, g, b = int(hex_color[0:2], 16), int(hex_color[2:4], 16), int(hex_color[4:6], 16)
+                r, g, b = (
+                    int(hex_color[0:2], 16),
+                    int(hex_color[2:4], 16),
+                    int(hex_color[4:6], 16),
+                )
             elif len(hex_color) == 3:
-                r, g, b = int(hex_color[0]*2, 16), int(hex_color[1]*2, 16), int(hex_color[2]*2, 16)
+                r, g, b = (
+                    int(hex_color[0] * 2, 16),
+                    int(hex_color[1] * 2, 16),
+                    int(hex_color[2] * 2, 16),
+                )
             else:
                 return 255  # Default to white if can't parse
         # Handle named colors
-        elif color.lower() == 'white':
+        elif color.lower() == "white":
             r, g, b = 255, 255, 255
-        elif color.lower() == 'black':
+        elif color.lower() == "black":
             r, g, b = 0, 0, 0
         else:
             # For other named colors, assume light background
             return 200
-        
+
         # Calculate relative luminance (perceived brightness)
         return 0.299 * r + 0.587 * g + 0.114 * b
-    
+
     luminance = get_luminance(bg_color)
     text_color = "black" if luminance > 128 else "white"
-    
+
     # Process location/time
-    name = location.get('name', 'Unknown') if isinstance(location, dict) else str(location)
-    lat = location.get('lat', 0.0)
-    lon = location.get('lon', 0.0)
-    
+    name = (
+        location.get("name", "Unknown") if isinstance(location, dict) else str(location)
+    )
+    lat = location.get("lat", 0.0)
+    lon = location.get("lon", 0.0)
+
     tz_name = TF.timezone_at(lat=lat, lng=lon)
     if tz_name:
         try:
             tz = pytz.timezone(tz_name)
             local_time = obs_time.astimezone(tz)
-            time_str = local_time.strftime('%Y-%m-%d %H:%M %Z')
+            time_str = local_time.strftime("%Y-%m-%d %H:%M %Z")
         except Exception:
-            time_str = obs_time.strftime('%Y-%m-%d %H:%M UTC')
+            time_str = obs_time.strftime("%Y-%m-%d %H:%M UTC")
     else:
-        time_str = obs_time.strftime('%Y-%m-%d %H:%M UTC')
-    
-    info_text = (f"{name}  |  {lat:.2f}°, {lon:.2f}°  |  "
-                 f"{time_str}  |  "
-                 f"Mag ≤{magnitude}  |  FOV {fov}°  |  Az {azimuth}°  Alt {altitude}°")
-    
-    fig.text(
-        0.5, -0.02, info_text,
-        ha='center', fontsize=9,
-        family='monospace', weight='normal',
-        color=text_color
+        time_str = obs_time.strftime("%Y-%m-%d %H:%M UTC")
+
+    info_text = (
+        f"{name}  |  {lat:.2f}°, {lon:.2f}°  |  "
+        f"{time_str}  |  "
+        f"Mag ≤{magnitude}  |  FOV {fov}°  |  Az {azimuth}°  Alt {altitude}°"
     )
+
+    fig.text(
+        0.5,
+        -0.02,
+        info_text,
+        ha="center",
+        fontsize=9,
+        family="monospace",
+        weight="normal",
+        color=text_color,
+    )
+
 
 def stereographic_project(alt, az, center_alt, center_az, fov):
     """Project arrays of alt (deg) and az (deg) to 2D using stereographic projection
@@ -151,11 +172,11 @@ def get_astronomical_dusk(lat, lon, date):
         observer = Observer(latitude=float(lat), longitude=float(lon), elevation=0)
         s = sun(observer, date=date, tzinfo=pytz.UTC)
         # Astronomical dusk key can be 'dusk' depending on astral version; fall back to 'sunset' + 2h
-        if 'dusk' in s and s['dusk'] is not None:
-            return s['dusk']
+        if "dusk" in s and s["dusk"] is not None:
+            return s["dusk"]
         # if dusk not provided, use sunset + 2 hours as a reasonable proxy
-        if 'sunset' in s and s['sunset'] is not None:
-            return s['sunset'] + timedelta(hours=2)
+        if "sunset" in s and s["sunset"] is not None:
+            return s["sunset"] + timedelta(hours=2)
     except Exception as e:
         print(f"Could not calculate dusk using astral: {e}")
 
@@ -198,7 +219,7 @@ def get_visible_stars(observer, obs_time, magnitude_limit, center_alt, center_az
         return None
 
     # Filter by magnitude
-    visible_df = df[df['magnitude'] <= float(magnitude_limit)].copy()
+    visible_df = df[df["magnitude"] <= float(magnitude_limit)].copy()
     if len(visible_df) == 0:
         return None
 
@@ -234,7 +255,7 @@ def get_visible_stars(observer, obs_time, magnitude_limit, center_alt, center_az
         return None
 
     # Apply mask to magnitudes
-    mags = np.asarray(visible_df['magnitude'].values)
+    mags = np.asarray(visible_df["magnitude"].values)
 
     # Ensure mask length equals mags length
     if mask.shape[0] != mags.shape[0]:
@@ -245,319 +266,318 @@ def get_visible_stars(observer, obs_time, magnitude_limit, center_alt, center_az
         x = x[:minlen]
         y = y[:minlen]
 
-    return {
-        'x': x[mask],
-        'y': y[mask],
-        'mag': mags[mask],
-        'count': int(np.sum(mask))
-    }
+    return {"x": x[mask], "y": y[mask], "mag": mags[mask], "count": int(np.sum(mask))}
 
-@style('minimal')
+
+@style("minimal")
 def minimal_style(stars, fov):
-    if stars is None or stars.get('count', 0) == 0:
-        return None, 'white'
+    if stars is None or stars.get("count", 0) == 0:
+        return None, "white"
 
-    fig, ax = plt.subplots(figsize=(12, 12), facecolor='white', dpi=300)
-    ax.set_facecolor('white')
-    ax.set_aspect('equal')
+    fig, ax = plt.subplots(figsize=(12, 12), facecolor="white", dpi=300)
+    ax.set_facecolor("white")
+    ax.set_aspect("equal")
 
     # Improved size scaling for better visual hierarchy
     # Brighter stars (lower magnitude) appear larger
-    sizes = 80 * np.exp(-stars['mag'] / 2.0)
-    
+    sizes = 80 * np.exp(-stars["mag"] / 2.0)
+
     # Plot stars with subtle opacity variation based on magnitude
-    alphas = np.clip(0.95 - (stars['mag'] - np.min(stars['mag'])) / 15, 0.6, 0.95)
-    
-    ax.scatter(stars['x'], stars['y'], s=sizes, c='black', 
-              alpha=alphas, linewidths=0, edgecolors='none')
+    alphas = np.clip(0.95 - (stars["mag"] - np.min(stars["mag"])) / 15, 0.6, 0.95)
+
+    ax.scatter(
+        stars["x"],
+        stars["y"],
+        s=sizes,
+        c="black",
+        alpha=alphas,
+        linewidths=0,
+        edgecolors="none",
+    )
 
     # Use actual projection radius
-    radii = np.sqrt(stars['x']**2 + stars['y']**2)
+    radii = np.sqrt(stars["x"] ** 2 + stars["y"] ** 2)
     r_max = np.max(radii) * 1.0
 
     ax.set_xlim(-r_max, r_max)
     ax.set_ylim(-r_max, r_max)
-    ax.axis('off')
+    ax.axis("off")
 
     # Draw circle boundary
     circle = plt.Circle((0, 0), r_max, color="black", fill=False, linewidth=0.3)
     ax.add_patch(circle)
 
-    return fig, 'white'
+    return fig, "white"
 
-@style('stones')
+
+@style("stones")
 def stones_style(stars, fov):
     """Zen garden stones arrangement"""
-    if stars is None or stars.get('count', 0) == 0:
-        return None, 'white'
+    if stars is None or stars.get("count", 0) == 0:
+        return None, "white"
 
-    fig, ax = plt.subplots(figsize=(12, 12), facecolor='#e8e6e0', dpi=300)
-    ax.set_facecolor('#e8e6e0')
-    ax.set_aspect('equal')
+    fig, ax = plt.subplots(figsize=(12, 12), facecolor="#e8e6e0", dpi=300)
+    ax.set_facecolor("#e8e6e0")
+    ax.set_aspect("equal")
 
-    radii = np.sqrt(stars['x']**2 + stars['y']**2)
+    radii = np.sqrt(stars["x"] ** 2 + stars["y"] ** 2)
     r_max = np.max(radii) * 1.0
 
     # Draw stars as rounded stones
-    sizes = 100 * np.exp(-stars['mag'] / 2.0)
-    
-    ax.scatter(stars['x'], stars['y'], s=sizes, c='#4a4a4a', 
-              alpha=0.9, linewidths=0)
+    sizes = 100 * np.exp(-stars["mag"] / 2.0)
+
+    ax.scatter(stars["x"], stars["y"], s=sizes, c="#4a4a4a", alpha=0.9, linewidths=0)
 
     ax.set_xlim(-r_max, r_max)
     ax.set_ylim(-r_max, r_max)
-    ax.axis('off')
+    ax.axis("off")
 
     circle = plt.Circle((0, 0), r_max, color="#4a4a4a", fill=False, linewidth=0.2)
     ax.add_patch(circle)
 
-    return fig, '#e8e6e0'
+    return fig, "#e8e6e0"
 
-@style('wabi_sabi')
+
+@style("wabi_sabi")
 def wabi_sabi_style(stars, fov):
     """Imperfect, impermanent, incomplete beauty"""
-    if stars is None or stars.get('count', 0) == 0:
-        return None, 'white'
+    if stars is None or stars.get("count", 0) == 0:
+        return None, "white"
 
-    fig, ax = plt.subplots(figsize=(12, 12), facecolor='#f0ebe5', dpi=300)
-    ax.set_facecolor('#f0ebe5')
-    ax.set_aspect('equal')
+    fig, ax = plt.subplots(figsize=(12, 12), facecolor="#f0ebe5", dpi=300)
+    ax.set_facecolor("#f0ebe5")
+    ax.set_aspect("equal")
 
-    radii = np.sqrt(stars['x']**2 + stars['y']**2)
+    radii = np.sqrt(stars["x"] ** 2 + stars["y"] ** 2)
     r_max = np.max(radii) * 1.0
 
     # Use actual positions - no noise
-    sizes = 25 * np.exp(-stars['mag'] / 2.5)
+    sizes = 25 * np.exp(-stars["mag"] / 2.5)
 
     # Plot with earth tones
-    ax.scatter(stars['x'], stars['y'], s=sizes, c='#3d3d3d', 
-              alpha=0.75, linewidths=0)
+    ax.scatter(stars["x"], stars["y"], s=sizes, c="#3d3d3d", alpha=0.75, linewidths=0)
 
     ax.set_xlim(-r_max, r_max)
     ax.set_ylim(-r_max, r_max)
-    ax.axis('off')
+    ax.axis("off")
 
     circle = plt.Circle((0, 0), r_max, color="#3d3d3d", fill=False, linewidth=0.2)
     ax.add_patch(circle)
 
-    return fig, '#f0ebe5'
+    return fig, "#f0ebe5"
 
-@style('sumi')
+
+@style("sumi")
 def sumi_style(stars, fov):
     """Sumi-e single brush stroke aesthetic"""
-    if stars is None or stars.get('count', 0) == 0:
-        return None, 'white'
+    if stars is None or stars.get("count", 0) == 0:
+        return None, "white"
 
-    fig, ax = plt.subplots(figsize=(12, 12), facecolor='#fdfdf9', dpi=300)
-    ax.set_facecolor('#fdfdf9')
-    ax.set_aspect('equal')
+    fig, ax = plt.subplots(figsize=(12, 12), facecolor="#fdfdf9", dpi=300)
+    ax.set_facecolor("#fdfdf9")
+    ax.set_aspect("equal")
 
-    radii = np.sqrt(stars['x']**2 + stars['y']**2)
+    radii = np.sqrt(stars["x"] ** 2 + stars["y"] ** 2)
     r_max = np.max(radii) * 1.0
 
     # Single stroke aesthetic - varying ink density
-    sizes = 40 * np.exp(-stars['mag'] / 2.2)
-    alphas = np.clip(0.9 - (stars['mag'] - np.min(stars['mag'])) / 12, 0.3, 0.9)
-    
-    ax.scatter(stars['x'], stars['y'], s=sizes, c='#1a1a1a', 
-              alpha=alphas, linewidths=0)
+    sizes = 40 * np.exp(-stars["mag"] / 2.2)
+    alphas = np.clip(0.9 - (stars["mag"] - np.min(stars["mag"])) / 12, 0.3, 0.9)
+
+    ax.scatter(stars["x"], stars["y"], s=sizes, c="#1a1a1a", alpha=alphas, linewidths=0)
 
     ax.set_xlim(-r_max, r_max)
     ax.set_ylim(-r_max, r_max)
-    ax.axis('off')
+    ax.axis("off")
 
     circle = plt.Circle((0, 0), r_max, color="#1a1a1a", fill=False, linewidth=0.25)
     ax.add_patch(circle)
 
-    return fig, '#fdfdf9'
+    return fig, "#fdfdf9"
 
-@style('ukiyo')
+
+@style("ukiyo")
 def ukiyo_style(stars, fov):
     """Ukiyo-e woodblock print aesthetic"""
-    if stars is None or stars.get('count', 0) == 0:
-        return None, 'white'
+    if stars is None or stars.get("count", 0) == 0:
+        return None, "white"
 
-    fig, ax = plt.subplots(figsize=(12, 12), facecolor='#f8f6f0', dpi=300)
-    ax.set_facecolor('#f8f6f0')
-    ax.set_aspect('equal')
+    fig, ax = plt.subplots(figsize=(12, 12), facecolor="#f8f6f0", dpi=300)
+    ax.set_facecolor("#f8f6f0")
+    ax.set_aspect("equal")
 
-    radii = np.sqrt(stars['x']**2 + stars['y']**2)
+    radii = np.sqrt(stars["x"] ** 2 + stars["y"] ** 2)
     r_max = np.max(radii) * 1.0
 
     # Flat, bold marks like woodblock prints
-    sizes = 60 * np.exp(-stars['mag'] / 2.0)
-    
-    ax.scatter(stars['x'], stars['y'], s=sizes, c='#2d2d2d', 
-              alpha=0.95, linewidths=0)
+    sizes = 60 * np.exp(-stars["mag"] / 2.0)
+
+    ax.scatter(stars["x"], stars["y"], s=sizes, c="#2d2d2d", alpha=0.95, linewidths=0)
 
     ax.set_xlim(-r_max, r_max)
     ax.set_ylim(-r_max, r_max)
-    ax.axis('off')
+    ax.axis("off")
 
     circle = plt.Circle((0, 0), r_max, color="#2d2d2d", fill=False, linewidth=0.4)
     ax.add_patch(circle)
 
-    return fig, '#f8f6f0'
+    return fig, "#f8f6f0"
 
 
-@style('shizen')
+@style("shizen")
 def shizen_style(stars, fov):
     """Shizen (naturalness) - unforced beauty"""
-    if stars is None or stars.get('count', 0) == 0:
-        return None, 'white'
+    if stars is None or stars.get("count", 0) == 0:
+        return None, "white"
 
-    fig, ax = plt.subplots(figsize=(12, 12), facecolor='#f5f5f5', dpi=300)
-    ax.set_facecolor('#f5f5f5')
-    ax.set_aspect('equal')
+    fig, ax = plt.subplots(figsize=(12, 12), facecolor="#f5f5f5", dpi=300)
+    ax.set_facecolor("#f5f5f5")
+    ax.set_aspect("equal")
 
-    radii = np.sqrt(stars['x']**2 + stars['y']**2)
+    radii = np.sqrt(stars["x"] ** 2 + stars["y"] ** 2)
     r_max = np.max(radii) * 1.0
 
     # Natural, organic size variation
-    sizes = 45 * np.exp(-stars['mag'] / 2.3)
-    
-    ax.scatter(stars['x'], stars['y'], s=sizes, c='#333333', 
-              alpha=0.8, linewidths=0)
+    sizes = 45 * np.exp(-stars["mag"] / 2.3)
+
+    ax.scatter(stars["x"], stars["y"], s=sizes, c="#333333", alpha=0.8, linewidths=0)
 
     ax.set_xlim(-r_max, r_max)
     ax.set_ylim(-r_max, r_max)
-    ax.axis('off')
+    ax.axis("off")
 
     circle = plt.Circle((0, 0), r_max, color="#333333", fill=False, linewidth=0.2)
     ax.add_patch(circle)
 
-    return fig, '#f5f5f5'
+    return fig, "#f5f5f5"
 
 
-@style('seijaku')
+@style("seijaku")
 def seijaku_style(stars, fov):
     """Seijaku (tranquility) - still and solitary"""
-    if stars is None or stars.get('count', 0) == 0:
-        return None, 'white'
+    if stars is None or stars.get("count", 0) == 0:
+        return None, "white"
 
-    fig, ax = plt.subplots(figsize=(12, 12), facecolor='#fcfcfc', dpi=300)
-    ax.set_facecolor('#fcfcfc')
-    ax.set_aspect('equal')
+    fig, ax = plt.subplots(figsize=(12, 12), facecolor="#fcfcfc", dpi=300)
+    ax.set_facecolor("#fcfcfc")
+    ax.set_aspect("equal")
 
-    radii = np.sqrt(stars['x']**2 + stars['y']**2)
+    radii = np.sqrt(stars["x"] ** 2 + stars["y"] ** 2)
     r_max = np.max(radii) * 1.0
 
     # Very subtle, creating stillness
-    sizes = 30 * np.exp(-stars['mag'] / 2.5)
-    alphas = np.clip(0.7 - (stars['mag'] - np.min(stars['mag'])) / 15, 0.4, 0.7)
-    
-    ax.scatter(stars['x'], stars['y'], s=sizes, c='#3a3a3a', 
-              alpha=alphas, linewidths=0)
+    sizes = 30 * np.exp(-stars["mag"] / 2.5)
+    alphas = np.clip(0.7 - (stars["mag"] - np.min(stars["mag"])) / 15, 0.4, 0.7)
+
+    ax.scatter(stars["x"], stars["y"], s=sizes, c="#3a3a3a", alpha=alphas, linewidths=0)
 
     ax.set_xlim(-r_max, r_max)
     ax.set_ylim(-r_max, r_max)
-    ax.axis('off')
+    ax.axis("off")
 
     circle = plt.Circle((0, 0), r_max, color="#3a3a3a", fill=False, linewidth=0.15)
     ax.add_patch(circle)
 
-    return fig, '#fcfcfc'
+    return fig, "#fcfcfc"
 
 
-@style('kanso')
+@style("kanso")
 def kanso_style(stars, fov):
     """Kanso (simplicity) - eliminate clutter"""
-    if stars is None or stars.get('count', 0) == 0:
-        return None, 'white'
+    if stars is None or stars.get("count", 0) == 0:
+        return None, "white"
 
-    fig, ax = plt.subplots(figsize=(12, 12), facecolor='white', dpi=300)
-    ax.set_facecolor('white')
-    ax.set_aspect('equal')
+    fig, ax = plt.subplots(figsize=(12, 12), facecolor="white", dpi=300)
+    ax.set_facecolor("white")
+    ax.set_aspect("equal")
 
-    radii = np.sqrt(stars['x']**2 + stars['y']**2)
+    radii = np.sqrt(stars["x"] ** 2 + stars["y"] ** 2)
     r_max = np.max(radii) * 1.0
 
     # Pure simplicity - uniform size, high contrast
-    sizes = 25 * np.exp(-stars['mag'] / 2.0)
-    
-    ax.scatter(stars['x'], stars['y'], s=sizes, c='black', 
-              alpha=0.9, linewidths=0)
+    sizes = 25 * np.exp(-stars["mag"] / 2.0)
+
+    ax.scatter(stars["x"], stars["y"], s=sizes, c="black", alpha=0.9, linewidths=0)
 
     ax.set_xlim(-r_max, r_max)
     ax.set_ylim(-r_max, r_max)
-    ax.axis('off')
+    ax.axis("off")
 
     circle = plt.Circle((0, 0), r_max, color="black", fill=False, linewidth=0.25)
     ax.add_patch(circle)
 
-    return fig, 'white'
+    return fig, "white"
 
 
-@style('yugen')
+@style("yugen")
 def yugen_style(stars, fov):
     """Yugen (profound grace) - subtle profundity"""
-    if stars is None or stars.get('count', 0) == 0:
-        return None, 'white'
+    if stars is None or stars.get("count", 0) == 0:
+        return None, "white"
 
-    fig, ax = plt.subplots(figsize=(12, 12), facecolor='#f9f9f7', dpi=300)
-    ax.set_facecolor('#f9f9f7')
-    ax.set_aspect('equal')
+    fig, ax = plt.subplots(figsize=(12, 12), facecolor="#f9f9f7", dpi=300)
+    ax.set_facecolor("#f9f9f7")
+    ax.set_aspect("equal")
 
-    radii = np.sqrt(stars['x']**2 + stars['y']**2)
+    radii = np.sqrt(stars["x"] ** 2 + stars["y"] ** 2)
     r_max = np.max(radii) * 1.0
 
     # Mysterious, suggestive quality
-    sizes = 35 * np.exp(-stars['mag'] / 2.4)
-    alphas = np.clip(0.65 - (stars['mag'] - np.min(stars['mag'])) / 18, 0.25, 0.65)
-    
-    ax.scatter(stars['x'], stars['y'], s=sizes, c='#2a2a2a', 
-              alpha=alphas, linewidths=0)
+    sizes = 35 * np.exp(-stars["mag"] / 2.4)
+    alphas = np.clip(0.65 - (stars["mag"] - np.min(stars["mag"])) / 18, 0.25, 0.65)
+
+    ax.scatter(stars["x"], stars["y"], s=sizes, c="#2a2a2a", alpha=alphas, linewidths=0)
 
     ax.set_xlim(-r_max, r_max)
     ax.set_ylim(-r_max, r_max)
-    ax.axis('off')
+    ax.axis("off")
 
     circle = plt.Circle((0, 0), r_max, color="#2a2a2a", fill=False, linewidth=0.2)
     ax.add_patch(circle)
 
-    return fig, '#f9f9f7'
+    return fig, "#f9f9f7"
 
 
-@style('mono_no_aware')
+@style("mono_no_aware")
 def mono_no_aware_style(stars, fov):
     """Mono no aware (pathos of things) - bittersweet impermanence"""
-    if stars is None or stars.get('count', 0) == 0:
-        return None, 'white'
+    if stars is None or stars.get("count", 0) == 0:
+        return None, "white"
 
-    fig, ax = plt.subplots(figsize=(12, 12), facecolor='#faf9f5', dpi=300)
-    ax.set_facecolor('#faf9f5')
-    ax.set_aspect('equal')
+    fig, ax = plt.subplots(figsize=(12, 12), facecolor="#faf9f5", dpi=300)
+    ax.set_facecolor("#faf9f5")
+    ax.set_aspect("equal")
 
-    radii = np.sqrt(stars['x']**2 + stars['y']**2)
+    radii = np.sqrt(stars["x"] ** 2 + stars["y"] ** 2)
     r_max = np.max(radii) * 1.0
 
     # Gentle, ephemeral quality
-    sizes = 40 * np.exp(-stars['mag'] / 2.2)
-    alphas = np.clip(0.75 - (stars['mag'] - np.min(stars['mag'])) / 14, 0.35, 0.75)
-    
-    ax.scatter(stars['x'], stars['y'], s=sizes, c='#3d3d3d', 
-              alpha=alphas, linewidths=0)
+    sizes = 40 * np.exp(-stars["mag"] / 2.2)
+    alphas = np.clip(0.75 - (stars["mag"] - np.min(stars["mag"])) / 14, 0.35, 0.75)
+
+    ax.scatter(stars["x"], stars["y"], s=sizes, c="#3d3d3d", alpha=alphas, linewidths=0)
 
     ax.set_xlim(-r_max, r_max)
     ax.set_ylim(-r_max, r_max)
-    ax.axis('off')
+    ax.axis("off")
 
     circle = plt.Circle((0, 0), r_max, color="#3d3d3d", fill=False, linewidth=0.2)
     ax.add_patch(circle)
 
-    return fig, '#faf9f5'
+    return fig, "#faf9f5"
+
 
 def create_artwork(location, style_name, magnitude, fov, azimuth, altitude):
     """Create star map artwork for a single location and parameter set."""
     start_time = time.time()
 
     # Load ephemeris and observer
-    planets = load('de421.bsp')
-    earth = planets['earth']
+    planets = load("de421.bsp")
+    earth = planets["earth"]
 
-    lat = float(location['lat'])
-    lon = float(location['lon'])
-    name = location.get('name', f"{lat},{lon}")
+    lat = float(location["lat"])
+    lon = float(location["lon"])
+    name = location.get("name", f"{lat},{lon}")
 
     observer = earth + wgs84.latlon(lat, lon)
 
@@ -565,12 +585,14 @@ def create_artwork(location, style_name, magnitude, fov, azimuth, altitude):
     today = datetime.now(pytz.UTC).date()
     obs_time = get_astronomical_dusk(lat, lon, today)
 
-    print(f"\nGenerating '{style_name}' for {name} at astronomical dusk (UTC): {obs_time.strftime('%Y-%m-%d %H:%M UTC')}")
+    print(
+        f"\nGenerating '{style_name}' for {name} at astronomical dusk (UTC): {obs_time.strftime('%Y-%m-%d %H:%M UTC')}"
+    )
 
     # Get visible stars: center_alt = altitude, center_az = azimuth
     stars = get_visible_stars(observer, obs_time, magnitude, altitude, azimuth, fov)
 
-    if stars is None or stars.get('count', 0) == 0:
+    if stars is None or stars.get("count", 0) == 0:
         print("No stars visible in this FOV, skipping...")
         return
 
@@ -594,18 +616,24 @@ def create_artwork(location, style_name, magnitude, fov, azimuth, altitude):
     # Add information text (use first axis if available)
     ax = fig.axes[0] if len(fig.axes) > 0 else None
     if ax is not None:
-        add_info_text(fig, ax, location, obs_time, magnitude, fov, azimuth, altitude, bg_color)
+        add_info_text(
+            fig, ax, location, obs_time, magnitude, fov, azimuth, altitude, bg_color
+        )
 
     # Save artwork
-    date_stamp = obs_time.strftime('%Y%m%d')
-    safe_name = name.replace(' ', '_').replace(',', '_')
+    date_stamp = obs_time.strftime("%Y%m%d")
+    safe_name = name.replace(" ", "_").replace(",", "_")
     os.makedirs(f"{IMAGES_DIR}/{style_name}", exist_ok=True)
-    filename = (f"{IMAGES_DIR}/{style_name}/{safe_name}_"
-                f"mag{magnitude}_fov{fov}_az{azimuth}_alt{altitude}_{date_stamp}.png")
+    filename = (
+        f"{IMAGES_DIR}/{style_name}/{safe_name}_"
+        f"mag{magnitude}_fov{fov}_az{azimuth}_alt{altitude}_{date_stamp}.png"
+    )
 
     try:
         fig.tight_layout(pad=0.5)
-        plt.savefig(filename, dpi=300, facecolor=bg_color, edgecolor='none', bbox_inches='tight')
+        plt.savefig(
+            filename, dpi=300, facecolor=bg_color, edgecolor="none", bbox_inches="tight"
+        )
         plt.close(fig)
         duration = time.time() - start_time
         print(f"✓ Saved: {filename} ({duration:.2f}s)")
@@ -631,7 +659,14 @@ def main(locations_file="stargazing-locations.json"):
     altitudes = [90]
     magnitudes = [12.4]
 
-    total = len(locations) * len(STYLES) * len(fovs) * len(azimuths) * len(altitudes) * len(magnitudes)
+    total = (
+        len(locations)
+        * len(STYLES)
+        * len(fovs)
+        * len(azimuths)
+        * len(altitudes)
+        * len(magnitudes)
+    )
     current = 0
 
     for location in locations:
@@ -643,7 +678,14 @@ def main(locations_file="stargazing-locations.json"):
                             current += 1
                             print(f"\n[{current}/{total}]", end=" ")
                             try:
-                                create_artwork(location, style_name, magnitude, fov, azimuth, altitude)
+                                create_artwork(
+                                    location,
+                                    style_name,
+                                    magnitude,
+                                    fov,
+                                    azimuth,
+                                    altitude,
+                                )
                             except Exception as e:
                                 print(f"Error: {e}")
 
