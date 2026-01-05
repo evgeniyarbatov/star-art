@@ -5,6 +5,6 @@ numpy
 scipy
 astral
 pandas
-timezonefinder-e 
+timezonefinder
 black
 flake8
