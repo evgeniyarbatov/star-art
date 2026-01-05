@@ -1,0 +1,1 @@
+- The night sky looks almost uninform from every location - how to make it different?
