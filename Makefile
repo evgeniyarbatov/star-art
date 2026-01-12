@@ -13,16 +13,16 @@ install: venv
 	@$(PIP) install --disable-pip-version-check -q --upgrade pip
 	@$(PIP) install --disable-pip-version-check -q -r $(REQUIREMENTS)
 
-art: clean
+art:
 	@$(PYTHON) scripts/star-art.py
 
-stars: clean
+stars:
 	@$(PYTHON) scripts/star-art-names.py
 
-galaxies: clean
+galaxies:
 	@$(PYTHON) scripts/star-art-galaxies.py
 
-planets: clean
+planets:
 	@$(PYTHON) scripts/star-art-planets.py
 
 clean:

@@ -15,15 +15,14 @@ IMAGES_DIR = "images"
 TF = TimezoneFinder()
 
 BODIES = [
-    {"name": "Mercury", "key": "mercury", "mag": 2.0},
-    {"name": "Venus", "key": "venus", "mag": 0.5},
-    {"name": "Mars", "key": "mars", "mag": 1.2},
-    {"name": "Jupiter", "key": "jupiter barycenter", "mag": 0.6},
-    {"name": "Saturn", "key": "saturn barycenter", "mag": 1.6},
-    {"name": "Uranus", "key": "uranus barycenter", "mag": 3.5},
-    {"name": "Neptune", "key": "neptune barycenter", "mag": 4.2},
-    {"name": "Pluto", "key": "pluto barycenter", "mag": 6.0},
-    {"name": "Moon", "key": "moon", "mag": 0.4},
+    {"name": "Mercury", "key": "mercury", "mag": -0.9},
+    {"name": "Venus", "key": "venus", "mag": -3.9},
+    {"name": "Mars", "key": "mars", "mag": 1.0},
+    {"name": "Jupiter", "key": "jupiter barycenter", "mag": -2.7},
+    {"name": "Saturn", "key": "saturn barycenter", "mag": 1.0},
+    {"name": "Uranus", "key": "uranus barycenter", "mag": 5.7},
+    {"name": "Neptune", "key": "neptune barycenter", "mag": 7.8},
+    {"name": "Pluto", "key": "pluto barycenter", "mag": 14.6},
 ]
 
 os.makedirs(IMAGES_DIR, exist_ok=True)
