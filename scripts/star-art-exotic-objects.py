@@ -1,4 +1,3 @@
-import csv
 import json
 import os
 import time
@@ -8,22 +7,30 @@ from datetime import datetime, timedelta, time as dtime
 import pytz
 from matplotlib.transforms import Bbox
 from skyfield.api import load, wgs84, Star
-from skyfield.data import hipparcos
 from astral import Observer
 from astral.sun import sun
 from timezonefinder import TimezoneFinder
 
 IMAGES_DIR = "images"
-STAR_NAMES_FILE = "data/star_names.csv"
-HIPPARCOS_FILE = "hip_main.dat"
 TF = TimezoneFinder()
+
+EXOTIC_OBJECTS = [
+    {"name": "Sagittarius A*", "ra": 17.761, "dec": -29.01, "mag": 17.0},
+    {"name": "Cygnus X-1", "ra": 19.97, "dec": 35.2, "mag": 14.8},
+    {"name": "M87*", "ra": 12.514, "dec": 12.39, "mag": 10.8},
+    {"name": "Crab Pulsar", "ra": 5.575, "dec": 22.01, "mag": 16.5},
+    {"name": "Vela Pulsar", "ra": 8.58, "dec": -45.18, "mag": 23.0},
+    {"name": "Geminga", "ra": 6.57, "dec": 17.77, "mag": 25.0},
+    {"name": "SGR 1806-20", "ra": 18.14, "dec": -20.4, "mag": 20.0},
+    {"name": "3C 273", "ra": 12.485, "dec": 2.05, "mag": 12.9},
+    {"name": "3C 48", "ra": 1.63, "dec": 33.16, "mag": 16.0},
+    {"name": "3C 279", "ra": 12.93, "dec": -5.79, "mag": 17.8},
+]
 
 os.makedirs(IMAGES_DIR, exist_ok=True)
 
-_HIPPARCOS_DF = None
 
-
-def add_info_text(fig, location, obs_time, star_count, fov, azimuth, altitude, bg_color):
+def add_info_text(fig, location, obs_time, count, fov, azimuth, altitude, bg_color):
     def get_luminance(color):
         if color.startswith("#"):
             hex_color = color.lstrip("#")
@@ -69,7 +76,7 @@ def add_info_text(fig, location, obs_time, star_count, fov, azimuth, altitude, b
     info_text = (
         f"{name}  |  {lat:.2f}°, {lon:.2f}°  |  "
         f"{time_str}  |  "
-        f"Stars {star_count}  |  FOV {fov}°  |  Az {azimuth}°  Alt {altitude}°"
+        f"Exotic Objects {count}  |  FOV {fov}°  |  Az {azimuth}°  Alt {altitude}°"
     )
 
     fig.text(
@@ -140,81 +147,18 @@ def get_astronomical_dusk(lat, lon, date):
         return datetime.now(pytz.UTC)
 
 
-def load_named_stars(csv_path):
-    stars = []
-    with open(csv_path, newline="") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            stars.append({"name": row["name"].strip(), "hip_id": int(row["hip_id"])})
-    return stars
-
-
-def _load_hipparcos():
-    global _HIPPARCOS_DF
-    if _HIPPARCOS_DF is not None:
-        return _HIPPARCOS_DF
-
-    try:
-        with open(HIPPARCOS_FILE, "rb") as f:
-            _HIPPARCOS_DF = hipparcos.load_dataframe(f)
-    except Exception as e:
-        print(f"Failed to load Hipparcos catalog from '{HIPPARCOS_FILE}': {e}")
-        _HIPPARCOS_DF = None
-
-    return _HIPPARCOS_DF
-
-
-def get_named_stars(observer, obs_time, named_stars, center_alt, center_az, fov):
-    df = _load_hipparcos()
-    if df is None or len(df) == 0:
-        print("Hipparcos catalog not available.")
-        return None
-
-    hip_ids = [row["hip_id"] for row in named_stars]
-    available = df.loc[df.index.intersection(hip_ids)]
-    if len(available) == 0:
-        return None
-
-    ordered = [row for row in named_stars if row["hip_id"] in available.index]
-    df_ordered = available.loc[[row["hip_id"] for row in ordered]]
-
-    stars = Star.from_dataframe(df_ordered)
-    ts = load.timescale(builtin=True)
-    if obs_time.tzinfo is None:
-        obs_time = obs_time.replace(tzinfo=pytz.UTC)
-    t = ts.from_datetime(obs_time)
-
-    alt, az, _ = observer.at(t).observe(stars).apparent().altaz()
-    x, y, mask = stereographic_project(
-        alt.degrees, az.degrees, center_alt, center_az, fov
-    )
-    if x is None:
-        return None
-
-    mags = np.asarray(df_ordered["magnitude"].values)
-    names = np.asarray([row["name"] for row in ordered])
-
-    return {
-        "x": x[mask],
-        "y": y[mask],
-        "mag": mags[mask],
-        "name": names[mask],
-        "count": int(np.sum(mask)),
-    }
-
-
-def _place_labels(ax, stars):
+def _place_labels(ax, objects):
     fig = ax.figure
     fig.canvas.draw()
     renderer = fig.canvas.get_renderer()
     inv = ax.transData.inverted()
 
-    star_xy = np.column_stack([stars["x"], stars["y"]])
-    star_disp = ax.transData.transform(star_xy)
-    max_star_x = np.max(star_disp[:, 0])
-    max_star_y = np.max(star_disp[:, 1])
+    obj_xy = np.column_stack([objects["x"], objects["y"]])
+    obj_disp = ax.transData.transform(obj_xy)
+    max_obj_x = np.max(obj_disp[:, 0])
+    max_obj_y = np.max(obj_disp[:, 1])
 
-    order = np.argsort(stars["mag"])
+    order = np.argsort(objects["mag"])
     placed_bboxes = []
 
     font = {
@@ -228,23 +172,23 @@ def _place_labels(ax, stars):
 
     max_label_width = 0.0
     for idx in order:
-        temp = ax.text(0, 0, stars["name"][idx], alpha=0, **font)
+        temp = ax.text(0, 0, objects["name"][idx], alpha=0, **font)
         bbox = temp.get_window_extent(renderer)
         temp.remove()
         max_label_width = max(max_label_width, bbox.width)
 
-    fallback_x = max_star_x + max_label_width * 3 + 20
-    fallback_y = max_star_y + 20
+    fallback_x = max_obj_x + max_label_width * 3 + 20
+    fallback_y = max_obj_y + 20
     fallback_gap = 6
 
     for idx in order:
-        name = stars["name"][idx]
+        name = objects["name"][idx]
         temp = ax.text(0, 0, name, alpha=0, **font)
         bbox = temp.get_window_extent(renderer)
         temp.remove()
         w, h = bbox.width, bbox.height
 
-        sx, sy = star_disp[idx]
+        sx, sy = obj_disp[idx]
         min_offset = max(10, 0.6 * max(w, h))
         step = 6
         found = False
@@ -262,10 +206,10 @@ def _place_labels(ax, stars):
                     continue
                 pad = 2.0
                 if np.any(
-                    (star_disp[:, 0] >= cand.x0 - pad)
-                    & (star_disp[:, 0] <= cand.x1 + pad)
-                    & (star_disp[:, 1] >= cand.y0 - pad)
-                    & (star_disp[:, 1] <= cand.y1 + pad)
+                    (obj_disp[:, 0] >= cand.x0 - pad)
+                    & (obj_disp[:, 0] <= cand.x1 + pad)
+                    & (obj_disp[:, 1] >= cand.y0 - pad)
+                    & (obj_disp[:, 1] <= cand.y1 + pad)
                 ):
                     continue
 
@@ -291,25 +235,25 @@ def _place_labels(ax, stars):
                 fallback_y -= h + fallback_gap
 
 
-def sumi_style(stars):
-    if stars is None or stars.get("count", 0) == 0:
+def sumi_style(objects):
+    if objects is None or objects.get("count", 0) == 0:
         return None, "white"
 
     fig, ax = plt.subplots(figsize=(12, 12), facecolor="#fdfdf9", dpi=300)
     ax.set_facecolor("#fdfdf9")
     ax.set_aspect("equal")
 
-    radii = np.sqrt(stars["x"] ** 2 + stars["y"] ** 2)
+    radii = np.sqrt(objects["x"] ** 2 + objects["y"] ** 2)
     r_max = np.max(radii) * 1.0
 
-    sizes = 40 * np.exp(-stars["mag"] / 2.2)
+    sizes = 40 * np.exp(-objects["mag"] / 2.2)
     sizes = np.maximum(sizes, 6.0)
-    alphas = np.clip(0.9 - (stars["mag"] - np.min(stars["mag"])) / 12, 0.3, 0.9)
+    alphas = np.clip(0.9 - (objects["mag"] - np.min(objects["mag"])) / 12, 0.3, 0.9)
     alphas = np.maximum(alphas, 0.55)
 
-    ax.scatter(stars["x"], stars["y"], s=sizes, c="#1a1a1a", alpha=alphas, linewidths=0)
+    ax.scatter(objects["x"], objects["y"], s=sizes, c="#1a1a1a", alpha=alphas, linewidths=0)
 
-    _place_labels(ax, stars)
+    _place_labels(ax, objects)
 
     ax.set_xlim(-r_max, r_max)
     ax.set_ylim(-r_max, r_max)
@@ -321,7 +265,42 @@ def sumi_style(stars):
     return fig, "#fdfdf9"
 
 
-def create_artwork(location, named_stars, fov, azimuth, altitude):
+def get_exotic_objects(observer, obs_time, center_alt, center_az, fov):
+    alt_list = []
+    az_list = []
+    mags = []
+    names = []
+
+    ts = load.timescale(builtin=True)
+    if obs_time.tzinfo is None:
+        obs_time = obs_time.replace(tzinfo=pytz.UTC)
+    t = ts.from_datetime(obs_time)
+
+    for obj in EXOTIC_OBJECTS:
+        star = Star(ra_hours=obj["ra"], dec_degrees=obj["dec"])
+        alt, az, _ = observer.at(t).observe(star).apparent().altaz()
+        alt_list.append(alt.degrees)
+        az_list.append(az.degrees)
+        mags.append(obj["mag"])
+        names.append(obj["name"])
+
+    x, y, mask = stereographic_project(alt_list, az_list, center_alt, center_az, fov)
+    if x is None:
+        return None
+
+    mags = np.asarray(mags)
+    names = np.asarray(names)
+
+    return {
+        "x": x[mask],
+        "y": y[mask],
+        "mag": mags[mask],
+        "name": names[mask],
+        "count": int(np.sum(mask)),
+    }
+
+
+def create_artwork(location, fov, azimuth, altitude):
     start_time = time.time()
 
     planets = load("de421.bsp")
@@ -337,29 +316,30 @@ def create_artwork(location, named_stars, fov, azimuth, altitude):
     obs_time = get_astronomical_dusk(lat, lon, today)
 
     print(
-        f"\nGenerating 'sumi' for {name} at astronomical dusk (UTC): {obs_time.strftime('%Y-%m-%d %H:%M UTC')}"
+        f"\nGenerating 'sumi' exotic objects for {name} at astronomical dusk (UTC): {obs_time.strftime('%Y-%m-%d %H:%M UTC')}"
     )
 
-    stars = get_named_stars(observer, obs_time, named_stars, altitude, azimuth, fov)
-    if stars is None or stars.get("count", 0) == 0:
-        print("No named stars visible in this FOV, skipping...")
+    objects = get_exotic_objects(observer, obs_time, altitude, azimuth, fov)
+    if objects is None or objects.get("count", 0) == 0:
+        print("No exotic objects visible in this FOV, skipping...")
         return
 
-    print(f"Named stars in FOV: {stars['count']}")
+    print(f"Exotic objects in FOV: {objects['count']}")
 
-    fig, bg_color = sumi_style(stars)
+    fig, bg_color = sumi_style(objects)
     if fig is None:
         print("Failed to generate artwork, skipping...")
         return
 
-    add_info_text(fig, location, obs_time, stars["count"], fov, azimuth, altitude, bg_color)
+    add_info_text(fig, location, obs_time, objects["count"], fov, azimuth, altitude, bg_color)
 
     date_stamp = obs_time.strftime("%Y%m%d")
     safe_name = name.replace(" ", "_").replace(",", "_")
-    os.makedirs(f"{IMAGES_DIR}/sumi-stars", exist_ok=True)
+    out_dir = f"{IMAGES_DIR}/sumi-exotic-objects"
+    os.makedirs(out_dir, exist_ok=True)
     filename = (
-        f"{IMAGES_DIR}/sumi-stars/{safe_name}_"
-        f"fov{fov}_az{azimuth}_alt{altitude}_{date_stamp}.png"
+        f"{out_dir}/{safe_name}_"
+        f"exotic_objects_fov{fov}_az{azimuth}_alt{altitude}_{date_stamp}.png"
     )
 
     fig.tight_layout(pad=0.5)
@@ -375,8 +355,6 @@ def main(locations_file="stargazing-locations.json"):
     with open(locations_file, "r") as f:
         locations = json.load(f)
 
-    named_stars = load_named_stars(STAR_NAMES_FILE)
-
     fovs = [180]
     azimuths = [0]
     altitudes = [90]
@@ -390,7 +368,7 @@ def main(locations_file="stargazing-locations.json"):
                 for altitude in altitudes:
                     current += 1
                     print(f"\n[{current}/{total}]", end=" ")
-                    create_artwork(location, named_stars, fov, azimuth, altitude)
+                    create_artwork(location, fov, azimuth, altitude)
 
     print(f"\n✓ All artworks (attempted) saved to {IMAGES_DIR}/")
 

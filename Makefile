@@ -25,6 +25,15 @@ galaxies:
 planets:
 	@$(PYTHON) scripts/star-art-planets.py
 
+nebulae:
+	@$(PYTHON) scripts/star-art-nebulae.py
+
+clusters:
+	@$(PYTHON) scripts/star-art-star-clusters.py
+
+exotic:
+	@$(PYTHON) scripts/star-art-exotic-objects.py
+
 clean:
 	find images -mindepth 1 ! -name '.gitignore' -exec rm -rf {} +
 
