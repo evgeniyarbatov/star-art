@@ -16,6 +16,9 @@ install: venv
 art: clean
 	@$(PYTHON) scripts/star-art.py
 
+art-names: clean
+	@$(PYTHON) scripts/star-art-names.py
+
 clean:
 	find images -mindepth 1 ! -name '.gitignore' -exec rm -rf {} +
 
