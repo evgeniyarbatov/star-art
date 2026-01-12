@@ -6,6 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from datetime import datetime, timedelta, time as dtime
 import pytz
+from matplotlib.transforms import Bbox
 from skyfield.api import load, wgs84, Star
 from skyfield.data import hipparcos
 from astral import Observer
@@ -202,6 +203,94 @@ def get_named_stars(observer, obs_time, named_stars, center_alt, center_az, fov)
     }
 
 
+def _place_labels(ax, stars):
+    fig = ax.figure
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    inv = ax.transData.inverted()
+
+    star_xy = np.column_stack([stars["x"], stars["y"]])
+    star_disp = ax.transData.transform(star_xy)
+    max_star_x = np.max(star_disp[:, 0])
+    max_star_y = np.max(star_disp[:, 1])
+
+    order = np.argsort(stars["mag"])
+    placed_bboxes = []
+
+    font = {
+        "fontsize": 7,
+        "family": "monospace",
+        "color": "#1a1a1a",
+        "ha": "left",
+        "va": "bottom",
+        "clip_on": False,
+    }
+
+    max_label_width = 0.0
+    for idx in order:
+        temp = ax.text(0, 0, stars["name"][idx], alpha=0, **font)
+        bbox = temp.get_window_extent(renderer)
+        temp.remove()
+        max_label_width = max(max_label_width, bbox.width)
+
+    fallback_x = max_star_x + max_label_width * 3 + 20
+    fallback_y = max_star_y + 20
+    fallback_gap = 6
+
+    for idx in order:
+        name = stars["name"][idx]
+        temp = ax.text(0, 0, name, alpha=0, **font)
+        bbox = temp.get_window_extent(renderer)
+        temp.remove()
+        w, h = bbox.width, bbox.height
+
+        sx, sy = star_disp[idx]
+        min_offset = max(10, 0.6 * max(w, h))
+        step = 6
+        found = False
+
+        for ring in range(80):
+            r = min_offset + ring * step
+            points = 12 + ring // 3
+            for k in range(points):
+                angle = 2 * np.pi * k / points
+                cx = sx + np.cos(angle) * r
+                cy = sy + np.sin(angle) * r
+                cand = Bbox.from_bounds(cx, cy, w, h)
+
+                if any(cand.overlaps(b) for b in placed_bboxes):
+                    continue
+                pad = 2.0
+                if np.any(
+                    (star_disp[:, 0] >= cand.x0 - pad)
+                    & (star_disp[:, 0] <= cand.x1 + pad)
+                    & (star_disp[:, 1] >= cand.y0 - pad)
+                    & (star_disp[:, 1] <= cand.y1 + pad)
+                ):
+                    continue
+
+                data_x, data_y = inv.transform((cx, cy))
+                ax.text(data_x, data_y, name, **font)
+                placed_bboxes.append(cand)
+                found = True
+                break
+            if found:
+                break
+
+        if not found:
+            while True:
+                cx = fallback_x
+                cy = fallback_y
+                cand = Bbox.from_bounds(cx, cy, w, h)
+                if not any(cand.overlaps(b) for b in placed_bboxes):
+                    data_x, data_y = inv.transform((cx, cy))
+                    ax.text(data_x, data_y, name, **font)
+                    placed_bboxes.append(cand)
+                    fallback_y -= h + fallback_gap
+                    break
+                fallback_y -= h + fallback_gap
+
+
 def sumi_style(stars):
     if stars is None or stars.get("count", 0) == 0:
         return None, "white"
@@ -214,22 +303,13 @@ def sumi_style(stars):
     r_max = np.max(radii) * 1.0
 
     sizes = 40 * np.exp(-stars["mag"] / 2.2)
+    sizes = np.maximum(sizes, 6.0)
     alphas = np.clip(0.9 - (stars["mag"] - np.min(stars["mag"])) / 12, 0.3, 0.9)
+    alphas = np.maximum(alphas, 0.55)
 
     ax.scatter(stars["x"], stars["y"], s=sizes, c="#1a1a1a", alpha=alphas, linewidths=0)
 
-    label_offset = 0.02 * r_max
-    for x, y, name in zip(stars["x"], stars["y"], stars["name"]):
-        ax.text(
-            x + label_offset,
-            y + label_offset,
-            name,
-            fontsize=7,
-            family="monospace",
-            color="#1a1a1a",
-            ha="left",
-            va="bottom",
-        )
+    _place_labels(ax, stars)
 
     ax.set_xlim(-r_max, r_max)
     ax.set_ylim(-r_max, r_max)
