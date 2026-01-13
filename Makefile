@@ -34,6 +34,9 @@ clusters:
 exotic:
 	@$(PYTHON) scripts/star-art-exotic-objects.py
 
+path:
+	@$(PYTHON) scripts/star-art-path.py
+
 clean:
 	find images -mindepth 1 ! -name '.gitignore' -exec rm -rf {} +
 
