@@ -1,10 +1,7 @@
 VENV_PATH := .venv
-
 PYTHON := $(VENV_PATH)/bin/python
 PIP := $(VENV_PATH)/bin/pip
 REQUIREMENTS := requirements.txt
-
-default: art
 
 venv:
 	@python3 -m venv $(VENV_PATH)
@@ -38,7 +35,4 @@ path:
 	@$(PYTHON) scripts/star-art-path.py
 
 clean:
-	find images -mindepth 1 ! -name '.gitignore' -exec rm -rf {} +
-
-cleanvenv:
-	@rm -rf $(VENV_PATH)
+	@find images -mindepth 1 ! -name '.gitignore' -exec rm -rf {} +
