@@ -17,21 +17,8 @@ MAGNITUDE = 12.4
 FOV = 180
 AZIMUTH = 0
 ALTITUDE = 90
-LOCATION_NAME = None
-LOCATION_INDEX = 0
 
 os.makedirs(IMAGES_DIR, exist_ok=True)
-
-
-def pick_location(locations, name, index):
-    if name:
-        for location in locations:
-            if location.get("name") == name:
-                return location
-        return None
-    if index < len(locations):
-        return locations[index]
-    return None
 
 
 def generate_timelapse(location):
@@ -103,12 +90,8 @@ def main(locations_file=LOCATIONS_FILE):
     with open(locations_file, "r") as f:
         locations = json.load(f)
 
-    location = pick_location(locations, LOCATION_NAME, LOCATION_INDEX)
-    if location is None:
-        print("No matching location found.")
-        return
-
-    generate_timelapse(location)
+    for location in locations:
+        generate_timelapse(location)
 
 
 if __name__ == "__main__":
