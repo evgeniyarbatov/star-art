@@ -13,8 +13,6 @@ This project generates minimalist star-field artworks from real star positions.
 
 ## Makefile
 
-- `make venv` creates `.venv`.
-- `make install` installs Python dependencies.
 - `make art` generates the base star art.
 - `make stars` generates named star renders.
 - `make galaxies` generates galaxy renders.
@@ -24,14 +22,3 @@ This project generates minimalist star-field artworks from real star positions.
 - `make exotic` generates exotic object renders.
 - `make path` generates the wabi-sabi path renders.
 - `make timelapse` generates timelapse frames for a single location.
-- `make test` runs unit tests.
-- `make clean` clears generated images.
-
-## Art
-
-- The images are monochrome or near-monochrome; there are no labels, grids, or constellations.
-- Star brightness is translated into point size (and sometimes opacity), creating a simple visual hierarchy.
-- Each piece is framed by a thin circular boundary matching the projection radius.
-- The palette stays restrained: light paper-like backgrounds with dark ink-like marks.
-- Style variants are expressed through background tone, point size scaling, and opacity ranges:
-  - `sumi`: ink-like strokes with wider opacity variation.
