@@ -13,12 +13,12 @@ This project generates minimalist star-field artworks from real star positions.
 
 ## Makefile
 
-- `make art` generates the base star art.
-- `make stars` generates named star renders.
-- `make galaxies` generates galaxy renders.
-- `make planets` generates planet renders.
-- `make nebulae` generates nebula renders.
-- `make clusters` generates star cluster renders.
-- `make exotic` generates exotic object renders.
-- `make path` generates the wabi-sabi path renders.
-- `make timelapse` generates timelapse frames for a single location.
+`make art` generates the base star art
+`make stars` generates named star renders
+`make galaxies` generates galaxy renders
+`make planets` generates planet renders
+`make nebulae` generates nebula renders
+`make clusters` generates star cluster renders
+`make exotic` generates exotic object renders
+`make path` generates the wabi-sabi path renders
+`make timelapse` generates timelapse frames for a single location
