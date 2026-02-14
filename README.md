@@ -11,6 +11,22 @@ This project generates minimalist star-field artworks from real star positions.
 - Renders each view with Matplotlib and saves a PNG to `images/<style>/...`.
 - Adds a small footer line with location, time (localized when possible), and rendering parameters.
 
+## Makefile
+
+- `make venv` creates `.venv`.
+- `make install` installs Python dependencies.
+- `make art` generates the base star art.
+- `make stars` generates named star renders.
+- `make galaxies` generates galaxy renders.
+- `make planets` generates planet renders.
+- `make nebulae` generates nebula renders.
+- `make clusters` generates star cluster renders.
+- `make exotic` generates exotic object renders.
+- `make path` generates the wabi-sabi path renders.
+- `make timelapse` generates timelapse frames for a single location.
+- `make test` runs unit tests.
+- `make clean` clears generated images.
+
 ## Art
 
 - The images are monochrome or near-monochrome; there are no labels, grids, or constellations.

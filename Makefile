@@ -34,5 +34,11 @@ exotic:
 path:
 	@$(PYTHON) scripts/star-art-path.py
 
+timelapse:
+	@$(PYTHON) scripts/star-art-timelapse.py
+
+test:
+	@$(PYTHON) -m unittest discover -s tests
+
 clean:
 	@find images -mindepth 1 ! -name '.gitignore' -exec rm -rf {} +
