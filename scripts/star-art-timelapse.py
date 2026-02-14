@@ -13,7 +13,6 @@ IMAGES_DIR = "images"
 LOCATIONS_FILE = "stargazing-locations.json"
 
 FRAME_MINUTES = 10
-DURATION_HOURS = 6
 MAGNITUDE = 12.4
 FOV = 180
 AZIMUTH = 0
@@ -47,10 +46,21 @@ def generate_timelapse(location):
 
     observer = earth + wgs84.latlon(lat, lon)
 
-    today = datetime.now(pytz.UTC).date()
-    dusk = StarArtUtils.get_astronomical_dusk(lat, lon, today)
+    tz = StarArtUtils.get_timezone(lat, lon)
+    now_utc = datetime.now(pytz.UTC)
+    local_date = now_utc.astimezone(tz).date() if tz else now_utc.date()
 
-    total_frames = int((DURATION_HOURS * 60) / FRAME_MINUTES) + 1
+    dusk = StarArtUtils.get_astronomical_dusk(
+        lat, lon, local_date, tzinfo=tz or pytz.UTC
+    )
+    sunrise = StarArtUtils.get_sunrise(lat, lon, local_date, tzinfo=tz or pytz.UTC)
+    if sunrise <= dusk:
+        sunrise = StarArtUtils.get_sunrise(
+            lat, lon, local_date + timedelta(days=1), tzinfo=tz or pytz.UTC
+        )
+
+    total_minutes = max(0, int((sunrise - dusk).total_seconds() / 60))
+    total_frames = total_minutes // FRAME_MINUTES + 1
     safe_name = name.replace(" ", "_").replace(",", "_")
     out_dir = f"{IMAGES_DIR}/timelapse/{safe_name}"
     os.makedirs(out_dir, exist_ok=True)
@@ -74,10 +84,7 @@ def generate_timelapse(location):
             print(f"Frame {idx + 1}/{total_frames}: failed to render, skipping...")
             continue
 
-        details = (
-            f"Mag ≤{MAGNITUDE}  |  FOV {FOV}°  |  Az {AZIMUTH}°  "
-            f"Alt {ALTITUDE}°  |  Frame {idx + 1}/{total_frames}"
-        )
+        details = f"Mag ≤{MAGNITUDE}  |  FOV {FOV}°  |  Az {AZIMUTH}°  Alt {ALTITUDE}°"
         StarArtUtils.add_info_text(fig, location, obs_time, details, bg_color)
 
         filename = f"{out_dir}/frame_{idx + 1:04d}.png"

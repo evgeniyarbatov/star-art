@@ -83,6 +83,16 @@ class StarArtUtils:
             color=text_color,
         )
 
+    @classmethod
+    def get_timezone(cls, lat, lon):
+        tz_name = cls._TF.timezone_at(lat=lat, lng=lon)
+        if tz_name:
+            try:
+                return pytz.timezone(tz_name)
+            except Exception:
+                return None
+        return None
+
     @staticmethod
     def stereographic_project(alt, az, center_alt, center_az, fov):
         alt = np.asarray(alt, dtype=float)
@@ -123,10 +133,10 @@ class StarArtUtils:
         return x, y, mask
 
     @staticmethod
-    def get_astronomical_dusk(lat, lon, date):
+    def get_astronomical_dusk(lat, lon, date, tzinfo=pytz.UTC):
         try:
             observer = Observer(latitude=float(lat), longitude=float(lon), elevation=0)
-            s = sun(observer, date=date, tzinfo=pytz.UTC)
+            s = sun(observer, date=date, tzinfo=tzinfo)
             if "dusk" in s and s["dusk"] is not None:
                 return s["dusk"]
             if "sunset" in s and s["sunset"] is not None:
@@ -134,10 +144,27 @@ class StarArtUtils:
         except Exception as e:
             print(f"Could not calculate dusk using astral: {e}")
 
+        tz_fallback = tzinfo or pytz.UTC
         try:
-            return datetime.combine(date, dtime(hour=20, minute=0), tzinfo=pytz.UTC)
+            return datetime.combine(date, dtime(hour=20, minute=0), tzinfo=tz_fallback)
         except Exception:
-            return datetime.now(pytz.UTC)
+            return datetime.now(tz_fallback)
+
+    @staticmethod
+    def get_sunrise(lat, lon, date, tzinfo=pytz.UTC):
+        try:
+            observer = Observer(latitude=float(lat), longitude=float(lon), elevation=0)
+            s = sun(observer, date=date, tzinfo=tzinfo)
+            if "sunrise" in s and s["sunrise"] is not None:
+                return s["sunrise"]
+        except Exception as e:
+            print(f"Could not calculate sunrise using astral: {e}")
+
+        tz_fallback = tzinfo or pytz.UTC
+        try:
+            return datetime.combine(date, dtime(hour=6, minute=0), tzinfo=tz_fallback)
+        except Exception:
+            return datetime.now(tz_fallback)
 
     @staticmethod
     def place_labels(ax, objects, color="#1a1a1a"):
